@@ -2,297 +2,69 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SF Halloween Decorations Map & Guide</title>
-  
-  <!-- Leaflet CSS (100% Free, No API Key Required) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Tailwind CSS for Styling -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <style>
-    body { background-color: #0f1016; color: #f3f4f6; font-family: system-ui, -apple-system, sans-serif; }
-    #map { height: 100%; width: 100%; min-height: 500px; z-index: 1; background: #18181b; }
-    .leaflet-popup-content-wrapper { background: #1f2029; color: #f9fafb; border: 1px solid #374151; border-radius: 10px; }
-    .leaflet-popup-tip { background: #1f2029; }
-    .custom-pin {
-      display: flex; align-items: center; justify-content: center;
-      width: 32px; height: 32px; border-radius: 50%;
-      font-size: 18px; box-shadow: 0 0 12px rgba(0,0,0,0.8);
-      border: 2px solid #fff;
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#171923" />
+  <meta name="description" content="Find San Francisco's Halloween decorations, highlighted streets, and neighborhood haunts. Explore the map and get directions." />
+  <title>SF Halloween · Neighborhood Haunt Guide</title>
+  <link rel="stylesheet" href="./assets/leaflet/leaflet.css" />
+  <link rel="stylesheet" href="./styles.css" />
 </head>
-<body class="h-screen flex flex-col overflow-hidden">
+<body>
+  <main id="map" aria-label="San Francisco Halloween neighborhood map"></main>
 
-  <!-- Top Navigation Header -->
-  <header class="bg-[#161722] border-b border-gray-800 px-4 py-3 flex flex-wrap items-center justify-between gap-3 z-10">
-    <div class="flex items-center gap-2">
-      <span class="text-2xl">🎃</span>
+  <header class="map-header">
+    <div class="brand">
+      <span class="brand-icon" aria-hidden="true">🎃</span>
       <div>
-        <h1 class="text-lg font-bold text-orange-400 leading-tight">SF Halloween Decorations Map</h1>
-        <p class="text-xs text-gray-400">OpenStreetMap + Leaflet (No API Key Required) • Google Maps Routing</p>
+        <p class="eyebrow">SAN FRANCISCO · OCT 31</p>
+        <h1>SF Halloween</h1>
       </div>
     </div>
-
-    <div class="flex flex-wrap items-center gap-2">
-      <!-- Tile Switcher -->
-      <select id="tileSelect" class="bg-gray-800 text-xs text-gray-200 border border-gray-700 rounded-lg px-2.5 py-2">
-        <option value="dark">🌙 Dark Spooky Map (CartoDB)</option>
-        <option value="osm">🗺️ Standard OpenStreetMap</option>
-        <option value="light">☀️ Light Map (Positron)</option>
-      </select>
-
-      <!-- Multi-Stop Google Maps Tour Button -->
-      <a href="https://www.google.com/maps/dir/?api=1&origin=Chenery+St+%26+Diamond+St,San+Francisco,CA&destination=Grove+St+%26+Lyon+St,San+Francisco,CA&waypoints=Shotwell+St+%26+22nd+St,San+Francisco,CA|Belvedere+St+%26+17th+St,San+Francisco,CA&travelmode=driving"
-         target="_blank" rel="noopener"
-         class="bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 shadow">
-        <span>🧭 Open Full 4-Stop Tour in Google Maps</span>
-      </a>
-    </div>
+    <button id="openGuide" class="button button-primary guide-toggle" type="button" aria-controls="guidePanel" aria-haspopup="dialog" aria-expanded="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3" cy="6" r="1"/><circle cx="3" cy="12" r="1"/><circle cx="3" cy="18" r="1"/></svg>
+      Explore<span class="desktop-label"> neighborhoods</span>
+    </button>
   </header>
 
-  <!-- Main Content Layout -->
-  <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
-    
-    <!-- Sidebar List -->
-    <aside class="w-full md:w-96 bg-[#13141d] border-r border-gray-800 overflow-y-auto p-4 space-y-3">
-      <div class="flex items-center justify-between text-xs text-gray-400 pb-1 border-b border-gray-800">
-        <span>CLICK A NEIGHBORHOOD TO ZOOM</span>
-        <button onclick="resetMapView()" class="text-orange-400 hover:underline">Reset View</button>
-      </div>
-      <div id="cardsContainer" class="space-y-3"></div>
-    </aside>
-
-    <!-- Interactive Map Container -->
-    <main class="flex-1 relative">
-      <div id="map"></div>
-    </main>
-
+  <div class="map-hint" aria-hidden="true">
+    <span class="hint-dots"><i></i><i></i><i></i><i></i></span>
+    <span><strong>4 neighborhoods</strong><br>Tap a pin to find your haunt</span>
   </div>
 
-  <!-- Leaflet JS (No API Key Required) -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script>
-    // 1. Initialize Map centered on San Francisco
-    const map = L.map('map').setView([37.758, -122.442], 13);
+  <div id="tileNotice" class="map-notice" role="status" hidden>
+    <span>Map tiles couldn’t load. Check your connection and try again.</span>
+    <button id="retryTiles" class="button button-secondary" type="button">Retry map</button>
+  </div>
+  <p id="mapStatus" class="sr-only" role="status"></p>
 
-    // 2. Key-Free Open Map Tile Providers
-    const tileLayers = {
-      dark: L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-        subdomains: 'abcd',
-        maxZoom: 20
-      }),
-      osm: L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors',
-        maxZoom: 19
-      }),
-      light: L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-        subdomains: 'abcd',
-        maxZoom: 20
-      })
-    };
+  <dialog id="guidePanel" aria-labelledby="guideTitle">
+    <div class="drawer-header">
+      <div>
+        <p class="eyebrow">THE NEIGHBORHOOD GUIDE</p>
+        <h2 id="guideTitle">Find your kind of spooky.</h2>
+      </div>
+      <button id="closeGuide" class="icon-button" type="button" aria-label="Close neighborhood guide" autofocus>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>
+      </button>
+    </div>
+    <div class="drawer-content" tabindex="0" aria-label="Neighborhoods and tour">
+      <div class="guide-intro">
+        <p>Four neighborhoods. Plenty of Halloween spirit. Pick a stop to see the decorated streets, or make a night of it.</p>
+        <a class="button button-primary tour-link" href="https://www.google.com/maps/dir/?api=1&amp;origin=Chenery+St+%26+Diamond+St,San+Francisco,CA&amp;destination=Grove+St+%26+Lyon+St,San+Francisco,CA&amp;waypoints=Shotwell+St+%26+22nd+St,San+Francisco,CA%7CBelvedere+St+%26+17th+St,San+Francisco,CA&amp;travelmode=driving" target="_blank" rel="noopener noreferrer">
+          Open the 4-stop driving tour <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg>
+        </a>
+        <p class="tour-note">Opens Google Maps · Choose your travel mode there</p>
+      </div>
+      <div id="cardsContainer" class="neighborhoods"></div>
+      <div class="guide-footer">
+        <p><strong>A little local knowledge</strong><br>Shaded areas are approximate; colored lines mark the suggested streets. Viewing times and street closures may change. Check locally before heading out.</p>
+        <p>Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.</p>
+      </div>
+    </div>
+  </dialog>
 
-    let currentTile = tileLayers.dark.addTo(map);
-
-    document.getElementById('tileSelect').addEventListener('change', (e) => {
-      map.removeLayer(currentTile);
-      currentTile = tileLayers[e.target.value].addTo(map);
-    });
-
-    // 3. Halloween Regions, Corridors & Coordinates
-    const spots = [
-      {
-        id: 'glen-park',
-        name: 'Glen Park ("Haunted Chenery")',
-        emoji: '🎃',
-        color: '#f97316',
-        center: [37.7345, -122.4335],
-        zoom: 16,
-        stretch: 'Chenery St (between Diamond St & Elk St) + Sussex St',
-        hours: 'Oct 31 Street Closure: 5:00 PM – 8:30 PM',
-        description: 'Features the famous car-free Haunted Chenery block party and the Vella family’s 175 hand-carved pumpkins on nearby Sussex Street.',
-        gmapsQuery: 'Chenery+St+%26+Diamond+St,San+Francisco,CA',
-        polygon: [
-          [37.7362, -122.4375], [37.7362, -122.4305],
-          [37.7322, -122.4305], [37.7322, -122.4375]
-        ],
-        corridors: [
-          {
-            name: 'Haunted Chenery Corridor',
-            coords: [[37.7347, -122.4316], [37.7341, -122.4342], [37.7335, -122.4366]]
-          },
-          {
-            name: 'Sussex St Pumpkin Display',
-            coords: [[37.7355, -122.4322], [37.7353, -122.4355]]
-          }
-        ]
-      },
-      {
-        id: 'nopa',
-        name: 'NoPa (Grove & Lyon Streets)',
-        emoji: '👻',
-        color: '#a855f7',
-        center: [37.7755, -122.4445],
-        zoom: 16,
-        stretch: 'Grove St (between Baker St, Lyon St & Central Ave)',
-        hours: 'Oct 31 Street Closure: 5:00 PM – 9:00 PM',
-        description: 'Towering Victorian and Edwardian homes transformed into theatrical haunted houses with massive neighborhood turnout.',
-        gmapsQuery: 'Grove+St+%26+Lyon+St,San+Francisco,CA',
-        polygon: [
-          [37.7772, -122.4480], [37.7772, -122.4410],
-          [37.7738, -122.4410], [37.7738, -122.4480]
-        ],
-        corridors: [
-          {
-            name: 'Grove Street Haunted Corridor',
-            coords: [[37.7758, -122.4418], [37.7753, -122.4468]]
-          }
-        ]
-      },
-      {
-        id: 'mission',
-        name: 'Mission District (Shotwell & Fair Oaks)',
-        emoji: '💀',
-        color: '#10b981',
-        center: [37.7552, -122.4158],
-        zoom: 15,
-        stretch: 'Shotwell St (20th–24th St) & Fair Oaks St (21st–26th St)',
-        hours: 'Best viewing: Dusk – 9:30 PM',
-        description: 'Flat, warm, and walkable blocks lined with decorated historic Victorians, creative stoop art, and lively crowds.',
-        gmapsQuery: 'Shotwell+St+%26+22nd+St,San+Francisco,CA',
-        polygon: [
-          [37.7595, -122.4265], [37.7595, -122.4135],
-          [37.7485, -122.4135], [37.7485, -122.4265]
-        ],
-        corridors: [
-          {
-            name: 'Shotwell St (20th to 24th St)',
-            coords: [[37.7588, -122.4159], [37.7523, -122.4153]]
-          },
-          {
-            name: 'Fair Oaks St (21st to 26th St)',
-            coords: [[37.7568, -122.4242], [37.7490, -122.4235]]
-          }
-        ]
-      },
-      {
-        id: 'cole-valley',
-        name: 'Cole Valley (Belvedere & Shrader)',
-        emoji: '🕸️',
-        color: '#06b6d4',
-        center: [37.7662, -122.4512],
-        zoom: 16,
-        stretch: 'Belvedere St & Shrader St (between Haight St & Parnassus Ave)',
-        hours: 'Best viewing: 5:00 PM – 9:00 PM',
-        description: 'Multi-story storybook homes on twin tree-lined streets featuring coordinated neighborhood-wide spooky themes.',
-        gmapsQuery: 'Belvedere+St+%26+17th+St,San+Francisco,CA',
-        polygon: [
-          [37.7695, -122.4540], [37.7695, -122.4485],
-          [37.7625, -122.4485], [37.7625, -122.4540]
-        ],
-        corridors: [
-          {
-            name: 'Belvedere Street Corridor',
-            coords: [[37.7690, -122.4519], [37.7632, -122.4512]]
-          },
-          {
-            name: 'Shrader Street Corridor',
-            coords: [[37.7691, -122.4503], [37.7634, -122.4497]]
-          }
-        ]
-      }
-    ];
-
-    const cardsContainer = document.getElementById('cardsContainer');
-
-    // 4. Render Shaded Regions, Glowing Corridors, Pins & Sidebar Cards
-    spots.forEach(spot => {
-      // Shaded Region Zone
-      L.polygon(spot.polygon, {
-        color: spot.color,
-        weight: 1.5,
-        dashArray: '5, 5',
-        fillColor: spot.color,
-        fillOpacity: 0.14
-      }).addTo(map);
-
-      // Highlighted Street Corridors
-      spot.corridors.forEach(corridor => {
-        L.polyline(corridor.coords, {
-          color: spot.color,
-          weight: 6,
-          opacity: 0.9
-        }).addTo(map).bindPopup(`<strong>${corridor.name}</strong><br><span class="text-xs text-gray-300">${spot.name}</span>`);
-      });
-
-      // Custom Emoji Pin
-      const icon = L.divIcon({
-        className: '',
-        html: `<div class="custom-pin" style="background:${spot.color}">${spot.emoji}</div>`,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16]
-      });
-
-      const gmapsDirectionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${spot.gmapsQuery}`;
-      const gmapsSearchUrl = `https://www.google.com/maps/search/?api=1&query=${spot.gmapsQuery}`;
-
-      const popupHtml = `
-        <div class="p-1 max-w-xs">
-          <div class="font-bold text-sm mb-1" style="color:${spot.color}">${spot.emoji} ${spot.name}</div>
-          <div class="text-xs text-gray-300 mb-1"><strong>Stretch:</strong> ${spot.stretch}</div>
-          <div class="text-xs text-gray-400 mb-2">${spot.description}</div>
-          <div class="flex gap-2 mt-2">
-            <a href="${gmapsDirectionsUrl}" target="_blank" rel="noopener"
-               class="bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-2.5 py-1.5 rounded no-underline inline-block">
-               🧭 Navigate in Google Maps
-            </a>
-          </div>
-        </div>
-      `;
-
-      const marker = L.marker(spot.center, { icon }).addTo(map).bindPopup(popupHtml);
-
-      // Build Sidebar Card
-      const card = document.createElement('div');
-      card.className = 'bg-[#1b1c28] hover:bg-[#222433] border border-gray-800 rounded-xl p-3.5 transition cursor-pointer';
-      card.innerHTML = `
-        <div class="flex items-center justify-between mb-1">
-          <h2 class="font-bold text-sm flex items-center gap-1.5" style="color:${spot.color}">
-            <span>${spot.emoji}</span> <span>${spot.name}</span>
-          </h2>
-        </div>
-        <p class="text-xs text-gray-300 font-medium mb-1">📍 ${spot.stretch}</p>
-        <p class="text-xs text-orange-300/90 mb-2">🕒 ${spot.hours}</p>
-        <p class="text-xs text-gray-400 mb-3">${spot.description}</p>
-        <div class="flex items-center gap-2">
-          <a href="${gmapsDirectionsUrl}" target="_blank" rel="noopener"
-             onclick="event.stopPropagation();"
-             class="flex-1 text-center bg-gray-800 hover:bg-gray-700 text-gray-100 text-xs font-medium py-1.5 px-2 rounded-lg border border-gray-700 transition">
-             🧭 Google Maps Directions
-          </a>
-          <a href="${gmapsSearchUrl}" target="_blank" rel="noopener"
-             onclick="event.stopPropagation();"
-             class="text-center bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs py-1.5 px-2.5 rounded-lg border border-gray-700 transition"
-             title="View Pin on Google Maps">
-             📍 Pin
-          </a>
-        </div>
-      `;
-
-      card.addEventListener('click', () => {
-        map.flyTo(spot.center, spot.zoom, { duration: 1.2 });
-        marker.openPopup();
-      });
-
-      cardsContainer.appendChild(card);
-    });
-
-    function resetMapView() {
-      map.flyTo([37.758, -122.442], 13, { duration: 1 });
-    }
-  </script>
+  <noscript><div class="map-notice">Enable JavaScript to explore the interactive map.</div></noscript>
+  <script src="./assets/leaflet/leaflet.js"></script>
+  <script src="./app.js"></script>
 </body>
 </html>
