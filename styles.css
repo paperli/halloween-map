@@ -51,10 +51,7 @@ h1 { margin: 0; font-size: 23px; line-height: 1.2; letter-spacing: -.04em; }
 }
 .map-hint strong { font-size: 14px; color: var(--text); font-weight: 650; }
 .hint-dots { display: grid; grid-template-columns: repeat(2, 8px); gap: 4px; }
-.hint-dots i { width: 8px; height: 8px; border-radius: 50%; background: #f97316; }
-.hint-dots i:nth-child(2) { background: #a855f7; }
-.hint-dots i:nth-child(3) { background: #10b981; }
-.hint-dots i:nth-child(4) { background: #06b6d4; }
+.hint-dots i { width: 8px; height: 8px; border-radius: 50%; background: var(--spot-color); }
 .map-notice {
   position: fixed; z-index: 600; bottom: max(32px, calc(env(safe-area-inset-bottom) + 24px));
   left: max(16px, env(safe-area-inset-left)); width: min(340px, calc(100% - 90px));
@@ -90,6 +87,9 @@ body:has(#tileNotice:not([hidden])) .map-hint { display: none; }
 }
 .icon-button:hover { background: #363c4b; }
 .drawer-content { min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; padding: 20px 22px; scrollbar-width: thin; scrollbar-color: #5d6274 transparent; }
+.city-switcher { display: flex; gap: 8px; margin-bottom: 20px; }
+.city-switcher .button { flex: 1; padding-inline: 8px; font-size: 13px; }
+.city-switcher [aria-current="location"] { background: #3d3028; border-color: var(--orange); color: var(--orange); }
 .guide-intro > p:first-child { margin: 0 0 18px; color: var(--muted); font-size: 15px; }
 .tour-link { width: 100%; justify-content: space-between; }
 .tour-note { margin: 8px 0 24px; text-align: center; color: var(--muted); font-size: 11px; }
@@ -102,6 +102,9 @@ body:has(#tileNotice:not([hidden])) .map-hint { display: none; }
 .spot-stretch { font-size: 14px; margin: 0 0 10px; }
 .spot-hours { font-size: 12px; color: #ffd2ae; margin: 0 0 12px; }
 .spot-description { font-size: 14px; color: var(--muted); margin: 0 0 16px; }
+.spot-source { display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; gap: 6px; }
+.spot-source svg { width: 14px; height: 14px; }
+.spot-card .spot-source { margin-top: 8px; }
 .card-actions { display: flex; gap: 8px; }
 .card-actions .button { flex: 1; padding-inline: 10px; font-size: 13px; }
 .spot-show { background: var(--page); border-color: #686e81; color: var(--text); }

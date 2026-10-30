@@ -2,10 +2,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const http = require('node:http');
+const vm = require('node:vm');
 const { chromium } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
-const prefix = '/sf-halloween-map/';
+const prefix = '/halloween-map/';
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=', 'base64');
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
 
@@ -27,6 +28,22 @@ const server = http.createServer(async (request, response) => {
 (async () => {
   let browser;
   try {
+    const guidesCode = await fs.readFile(path.join(root, 'guides.js'), 'utf8');
+    const guides = vm.runInNewContext(guidesCode + '; HALLOWEEN_GUIDES');
+    const ids = new Set();
+    for (const region of guides) {
+      assert.equal(region.tourOrder.length, region.spots.length);
+      assert.equal(new Set(region.tourOrder).size, region.spots.length, 'Each tour visits every stop once');
+      for (const id of region.tourOrder) assert.ok(region.spots.some(spot => spot.id === id), 'Tour stays within its city');
+      const [[south, west], [north, east]] = region.coverageBounds;
+      for (const spot of region.spots) {
+        assert.ok(!ids.has(spot.id), 'Unique neighborhood IDs');
+        ids.add(spot.id);
+        assert.ok(spot.center[0] >= south && spot.center[0] <= north && spot.center[1] >= west && spot.center[1] <= east, 'Spot is in its switching area');
+        if (region.id === 'la') assert.ok(new URL(spot.source.url).protocol === 'https:', 'LA sources use HTTPS');
+        for (const line of spot.corridors) assert.ok(line.coords.length >= 2, 'A corridor has at least two points');
+      }
+    }
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     const url = 'http://127.0.0.1:' + server.address().port + prefix;
     browser = await chromium.launch({
@@ -68,6 +85,11 @@ const server = http.createServer(async (request, response) => {
       let failTiles = false;
       await page.route('**/*', async route => {
         const requestUrl = route.request().url();
+        if (requestUrl === url + 'assets/leaflet/leaflet.js') {
+          // Capture the map only in tests to exercise real Leaflet pan/zoom events.
+          const leaflet = await fs.readFile(path.join(root, 'assets/leaflet/leaflet.js'), 'utf8');
+          return route.fulfill({ contentType: 'text/javascript', body: leaflet + '\nL.Map.addInitHook(function () { window.testMap = this; });' });
+        }
         if (requestUrl.startsWith(url)) return route.continue();
         externalRequests.push(requestUrl);
         if (/^https:\/\/tile\.openstreetmap\.org\/\d+\/\d+\/\d+\.png$/.test(requestUrl)) {
@@ -142,6 +164,60 @@ const server = http.createServer(async (request, response) => {
       await page.mouse.click(2, 2);
       assert.equal(await page.locator('dialog').evaluate(element => element.open), false, 'Backdrop dismisses guide');
 
+      // A city jump changes both the map overlays and the guide data.
+      await toggle.click();
+      await page.getByRole('button', { name: 'Los Angeles', exact: true }).click();
+      assert.equal(await page.locator('dialog').evaluate(element => element.open), false);
+      assert.equal(await page.locator('#mapTitle').textContent(), 'LA Halloween');
+      assert.equal(await page.locator('.halloween-marker').count(), 5);
+      assert.equal(await page.locator('#hintCount').textContent(), '5 neighborhoods');
+      await toggle.click();
+      assert.equal(await page.locator('#guideTitle').textContent(), 'Los Angeles haunts');
+      assert.deepEqual(await page.locator('.spot-card h3').allTextContents(), ['Toluca Lake', 'Burbank', 'Angelino Heights', 'Venice Canals', 'Sierra Madre']);
+      assert.equal(await page.getByRole('button', { name: 'Los Angeles', exact: true }).getAttribute('aria-current'), 'location');
+      assert.equal(await page.locator('.spot-card .spot-source').count(), 5, 'LA neighborhoods have source links');
+      const laTour = new URL(await page.locator('.tour-link').getAttribute('href'));
+      assert.equal(laTour.searchParams.get('waypoints').split('|').length, 3);
+      assert.match(laTour.searchParams.get('origin'), /Dell Ave/);
+      assert.match(laTour.searchParams.get('destination'), /Sierra Madre/);
+      assert.doesNotMatch(laTour.href, /San.Francisco|Chenery|Shotwell/);
+      const showSierra = page.getByRole('button', { name: 'Show Sierra Madre on map' });
+      await showSierra.scrollIntoViewIfNeeded();
+      await showSierra.click();
+      assert.match(await page.locator('.leaflet-popup').innerText(), /Sierra Madre[\s\S]*Alegria/);
+      await page.getByRole('button', { name: 'Show all neighborhoods' }).click();
+      assert.equal(await page.locator('#mapTitle').textContent(), 'LA Halloween', 'All fits the current city');
+
+      // Panning and zooming alone select the guide without snapping the map away.
+      await page.evaluate(() => window.testMap.setView([37.758, -122.442], 13, { animate: false }));
+      assert.equal(await page.locator('#mapTitle').textContent(), 'SF Halloween');
+      assert.equal(await page.locator('.halloween-marker').count(), 4);
+      await page.evaluate(() => window.testMap.setView([34.15, -118.36], 13, { animate: false }));
+      assert.equal(await page.locator('#mapTitle').textContent(), 'LA Halloween');
+      const panView = await page.evaluate(() => ({ lat: window.testMap.getCenter().lat, lng: window.testMap.getCenter().lng, zoom: window.testMap.getZoom() }));
+      assert.ok(Math.abs(panView.lat - 34.15) < 0.000001 && Math.abs(panView.lng + 118.36) < 0.000001);
+      assert.equal(panView.zoom, 13, 'Guide switch keeps the chosen zoom');
+      await toggle.click();
+      await page.getByRole('button', { name: 'Show Sierra Madre on map' }).scrollIntoViewIfNeeded();
+      const lastCard = await page.locator('.spot-card').last().elementHandle();
+      const previousScroll = await content.evaluate(element => element.scrollTop);
+      await page.evaluate(() => window.testMap.panBy([30, 0], { animate: false }));
+      assert.equal(await lastCard.evaluate(element => element.isConnected), true, 'Same-city movement preserves cards');
+      assert.equal(await content.evaluate(element => element.scrollTop), previousScroll, 'Same-city movement preserves guide scroll');
+
+      await page.evaluate(() => window.testMap.setView([35.2, -120], 10, { animate: false }));
+      assert.equal(await page.locator('#mapTitle').textContent(), 'Halloween Map');
+      assert.equal(await page.locator('.spot-card').count(), 0, 'Outside coverage does not show a stale city guide');
+      assert.equal(await page.locator('.tour-link').isVisible(), false);
+      assert.equal(await page.locator('[data-city][aria-current]').count(), 0);
+      assert.equal(await content.evaluate(element => element.scrollTop), 0, 'New area resets guide scroll');
+      await page.evaluate(() => window.testMap.fitBounds([[33.98, -122.46], [37.78, -118.04]], { animate: false }));
+      assert.equal(await page.locator('#mapTitle').textContent(), 'Halloween Map');
+      assert.equal(await page.locator('.halloween-marker').count(), 9, 'Wide overview shows both cities');
+      await page.getByRole('button', { name: 'San Francisco', exact: true }).click();
+      assert.equal(await page.locator('.halloween-marker').count(), 4);
+      assert.equal(await page.locator('#mapTitle').textContent(), 'SF Halloween');
+
       // Location is opt-in, updates without duplicate markers, and works outside SF.
       assert.equal(await page.evaluate(() => window.locationRequests), 0, 'No automatic location request');
       const locate = page.getByRole('button', { name: 'My location', exact: true });
@@ -163,8 +239,9 @@ const server = http.createServer(async (request, response) => {
       assert.equal(await page.locator('.user-location-marker').count(), 1);
       assert.equal(await page.locator('.location-accuracy').count(), 1);
       assert.equal(await page.evaluate(() => window.locationRequests), 2);
-      const sfMarkerBox = await firstMarker.boundingBox();
-      assert.ok(sfMarkerBox.x < 0 || sfMarkerBox.x > profile.width || sfMarkerBox.y < 0 || sfMarkerBox.y > profile.height, 'Map centers on the actual location outside SF');
+      assert.equal(await page.locator('#mapTitle').textContent(), 'LA Halloween', 'My location also selects the LA guide');
+      assert.equal(await page.locator('.halloween-marker').count(), 5);
+      assert.equal(await page.locator('.halloween-marker[aria-label="Glen Park"]').count(), 0, 'SF overlays are removed in LA');
       await page.locator('.user-location-marker').focus();
       await page.keyboard.press('Enter');
       assert.match(await page.locator('.leaflet-popup').innerText(), /Your location[\s\S]*100 m/);
