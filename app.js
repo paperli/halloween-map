@@ -8,24 +8,23 @@
     fadeAnimation: !reduceMotion,
     zoomAnimation: !reduceMotion,
     markerZoomAnimation: !reduceMotion
-  });
+  }).setView([37.758, -122.442], 13);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-  // Standard OpenStreetMap tiles: no account, API key, or third-party style service.
-  // Keep browser caching and the default referrer policy for OSM's tile usage policy.
+  // Keep normal browser caching, referrers, and attribution for OSM's tile policy.
   const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>',
     maxZoom: 19
   });
   const tileNotice = document.getElementById('tileNotice');
-  let failedTiles = new Set();
-  tiles.on('tileerror', (event) => {
+  const failedTiles = new Set();
+  tiles.on('tileerror', event => {
     failedTiles.add(event.tile.src);
     tileNotice.hidden = false;
   });
-  tiles.on('tileload', (event) => {
+  tiles.on('tileload tileunload', event => {
     failedTiles.delete(event.tile.src);
-    if (failedTiles.size === 0) tileNotice.hidden = true;
+    tileNotice.hidden = failedTiles.size === 0;
   });
   document.getElementById('retryTiles').addEventListener('click', () => {
     failedTiles.clear();
@@ -33,127 +32,60 @@
     tiles.redraw();
   });
 
-    const spots = [
-      {
-        id: 'glen-park',
-        name: 'Glen Park ("Haunted Chenery")',
-        emoji: '🎃',
-        color: '#f97316',
-        center: [37.7345, -122.4335],
-        zoom: 16,
-        stretch: 'Chenery St (between Diamond St & Elk St) + Sussex St',
-        hours: 'Oct 31 Street Closure: 5:00 PM – 8:30 PM',
-        description: 'Features the famous car-free Haunted Chenery block party and the Vella family’s 175 hand-carved pumpkins on nearby Sussex Street.',
-        gmapsQuery: 'Chenery+St+%26+Diamond+St,San+Francisco,CA',
-        polygon: [
-          [37.7362, -122.4375], [37.7362, -122.4305],
-          [37.7322, -122.4305], [37.7322, -122.4375]
-        ],
-        corridors: [
-          {
-            name: 'Haunted Chenery Corridor',
-            coords: [[37.7347, -122.4316], [37.7341, -122.4342], [37.7335, -122.4366]]
-          },
-          {
-            name: 'Sussex St Pumpkin Display',
-            coords: [[37.7355, -122.4322], [37.7353, -122.4355]]
-          }
-        ]
-      },
-      {
-        id: 'nopa',
-        name: 'NoPa (Grove & Lyon Streets)',
-        emoji: '👻',
-        color: '#a855f7',
-        center: [37.7755, -122.4445],
-        zoom: 16,
-        stretch: 'Grove St (between Baker St, Lyon St & Central Ave)',
-        hours: 'Oct 31 Street Closure: 5:00 PM – 9:00 PM',
-        description: 'Towering Victorian and Edwardian homes transformed into theatrical haunted houses with massive neighborhood turnout.',
-        gmapsQuery: 'Grove+St+%26+Lyon+St,San+Francisco,CA',
-        polygon: [
-          [37.7772, -122.4480], [37.7772, -122.4410],
-          [37.7738, -122.4410], [37.7738, -122.4480]
-        ],
-        corridors: [
-          {
-            name: 'Grove Street Haunted Corridor',
-            coords: [[37.7758, -122.4418], [37.7753, -122.4468]]
-          }
-        ]
-      },
-      {
-        id: 'mission',
-        name: 'Mission District (Shotwell & Fair Oaks)',
-        emoji: '💀',
-        color: '#10b981',
-        center: [37.7552, -122.4158],
-        zoom: 15,
-        stretch: 'Shotwell St (20th–24th St) & Fair Oaks St (21st–26th St)',
-        hours: 'Best viewing: Dusk – 9:30 PM',
-        description: 'Flat, warm, and walkable blocks lined with decorated historic Victorians, creative stoop art, and lively crowds.',
-        gmapsQuery: 'Shotwell+St+%26+22nd+St,San+Francisco,CA',
-        polygon: [
-          [37.7595, -122.4265], [37.7595, -122.4135],
-          [37.7485, -122.4135], [37.7485, -122.4265]
-        ],
-        corridors: [
-          {
-            name: 'Shotwell St (20th to 24th St)',
-            coords: [[37.7588, -122.4159], [37.7523, -122.4153]]
-          },
-          {
-            name: 'Fair Oaks St (21st to 26th St)',
-            coords: [[37.7568, -122.4242], [37.7490, -122.4235]]
-          }
-        ]
-      },
-      {
-        id: 'cole-valley',
-        name: 'Cole Valley (Belvedere & Shrader)',
-        emoji: '🕸️',
-        color: '#06b6d4',
-        center: [37.7662, -122.4512],
-        zoom: 16,
-        stretch: 'Belvedere St & Shrader St (between Haight St & Parnassus Ave)',
-        hours: 'Best viewing: 5:00 PM – 9:00 PM',
-        description: 'Multi-story storybook homes on twin tree-lined streets featuring coordinated neighborhood-wide spooky themes.',
-        gmapsQuery: 'Belvedere+St+%26+17th+St,San+Francisco,CA',
-        polygon: [
-          [37.7695, -122.4540], [37.7695, -122.4485],
-          [37.7625, -122.4485], [37.7625, -122.4540]
-        ],
-        corridors: [
-          {
-            name: 'Belvedere Street Corridor',
-            coords: [[37.7690, -122.4519], [37.7632, -122.4512]]
-          },
-          {
-            name: 'Shrader Street Corridor',
-            coords: [[37.7691, -122.4503], [37.7634, -122.4497]]
-          }
-        ]
-      }
-    ];
-
-
+  const regions = HALLOWEEN_GUIDES.map(region => ({
+    ...region,
+    coverage: L.latLngBounds(region.coverageBounds),
+    bounds: L.latLngBounds(region.spots.flatMap(spot => spot.polygon)),
+    layer: L.layerGroup()
+  }));
+  const allBounds = L.latLngBounds(regions.flatMap(region => region.spots.flatMap(spot => spot.polygon)));
   const guide = document.getElementById('guidePanel');
   const openGuide = document.getElementById('openGuide');
   const mapStatus = document.getElementById('mapStatus');
   const mapHint = document.querySelector('.map-hint');
   const cardsContainer = document.getElementById('cardsContainer');
-  const bounds = L.latLngBounds(spots.flatMap(spot => spot.polygon));
+  const drawerContent = document.querySelector('.drawer-content');
+  const tourLink = document.querySelector('.tour-link');
   const markers = new Map();
+  const externalIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg>';
+  let activeRegion;
+  let activePopup = null;
 
-  function fitAll() {
+  function directionsUrl(location) {
+    return 'https://www.google.com/maps/dir/?' + new URLSearchParams({ api: '1', destination: location });
+  }
+
+  function tourUrl(region) {
+    const stops = region.tourOrder.map(id => region.spots.find(spot => spot.id === id).location);
+    return 'https://www.google.com/maps/dir/?' + new URLSearchParams({
+      api: '1',
+      origin: stops[0],
+      destination: stops.at(-1),
+      waypoints: stops.slice(1, -1).join('|'),
+      travelmode: 'driving'
+    });
+  }
+
+  function sourceLink(spot) {
+    return spot.source
+      ? `<a class="spot-source" href="${spot.source.url}" target="_blank" rel="noopener noreferrer" aria-label="Read local guide for ${spot.name}">${spot.source.label} ${externalIcon}</a>`
+      : '';
+  }
+
+  function fitRegion(region) {
     map.closePopup();
-    map.fitBounds(bounds, {
+    map.fitBounds(region ? region.bounds : allBounds, {
       paddingTopLeft: [32, 115],
       paddingBottomRight: [70, 110],
       maxZoom: 14,
       animate: false
     });
-    mapStatus.textContent = 'Showing all four Halloween neighborhoods.';
+  }
+
+  function fitAll() {
+    fitRegion(activeRegion);
+    const label = activeRegion ? activeRegion.name : 'San Francisco and Los Angeles';
+    mapStatus.textContent = 'Showing all mapped neighborhoods in ' + label + '.';
   }
 
   openGuide.addEventListener('click', () => {
@@ -177,6 +109,13 @@
     pointerStartedOutside = false;
   });
 
+  document.querySelectorAll('[data-city]').forEach(button => {
+    button.addEventListener('click', () => {
+      guide.close();
+      fitRegion(regions.find(region => region.id === button.dataset.city));
+    });
+  });
+
   const resetControl = L.control({ position: 'bottomright' });
   resetControl.onAdd = () => {
     const container = L.DomUtil.create('div', 'leaflet-bar');
@@ -184,7 +123,7 @@
     button.href = '#map';
     button.setAttribute('role', 'button');
     button.setAttribute('aria-label', 'Show all neighborhoods');
-    button.title = 'Show all neighborhoods';
+    button.title = 'Show all neighborhoods in this guide';
     button.textContent = 'All';
     L.DomEvent.disableClickPropagation(container);
     L.DomEvent.on(button, 'click', event => {
@@ -201,14 +140,123 @@
   };
   resetControl.addTo(map);
 
-  tiles.addTo(map);
-  fitAll();
+  const locationNotice = document.getElementById('locationNotice');
+  const locationStatus = document.getElementById('locationStatus');
+  let locationMarker;
+  let accuracyCircle;
+  let locationButton;
 
-  spots.forEach(spot => {
-    const [shortName, detail] = spot.name.split(' (');
-    const subtitle = detail ? detail.replace(/\)$/, '').replaceAll('"', '') : '';
-    const directions = 'https://www.google.com/maps/dir/?api=1&destination=' + spot.gmapsQuery;
+  function showLocationMessage(message) {
+    locationStatus.textContent = message;
+    locationNotice.hidden = false;
+  }
 
+  document.getElementById('dismissLocationNotice').addEventListener('click', () => {
+    locationNotice.hidden = true;
+    locationButton.focus({ preventScroll: true });
+  });
+
+  function finishLocating() {
+    locationButton.disabled = false;
+    locationButton.setAttribute('aria-busy', 'false');
+  }
+
+  function showLocationError(error) {
+    finishLocating();
+    const messages = {
+      1: 'Location access was denied. Allow location for this site in your browser settings, then try again.',
+      2: 'Your location is unavailable. Check that location services are enabled, then try again.',
+      3: 'Finding your location took too long. Try again where you have a clearer GPS signal.'
+    };
+    const message = messages[error.code] || 'Your location couldn’t be found. Please try again.';
+    showLocationMessage(message + (locationMarker ? ' The dot still shows your last found position.' : ''));
+  }
+
+  function showLocation(position) {
+    finishLocating();
+    const { latitude, longitude, accuracy } = position.coords;
+    const latlng = L.latLng(latitude, longitude);
+    const accuracyText = Math.round(accuracy).toLocaleString();
+    if (!accuracyCircle) {
+      accuracyCircle = L.circle(latlng, {
+        radius: accuracy,
+        color: '#2563eb',
+        weight: 1,
+        opacity: 0.5,
+        fillColor: '#3b82f6',
+        fillOpacity: 0.12,
+        interactive: false,
+        className: 'location-accuracy'
+      }).addTo(map);
+      locationMarker = L.marker(latlng, {
+        icon: L.divIcon({
+          className: 'user-location-marker',
+          html: '<span class="user-location-dot" aria-hidden="true"></span>',
+          iconSize: [44, 44],
+          iconAnchor: [22, 22],
+          popupAnchor: [0, -10]
+        }),
+        title: 'Your location',
+        alt: 'Your location',
+        zIndexOffset: 1000
+      }).addTo(map);
+      locationMarker.getElement().setAttribute('aria-label', 'Your location');
+    } else {
+      accuracyCircle.setLatLng(latlng).setRadius(accuracy);
+      locationMarker.setLatLng(latlng);
+    }
+    locationMarker.bindPopup('<strong>Your location</strong><br>Approximate accuracy: ' + accuracyText + ' m.<br>Tap My location again to refresh.');
+    map.closePopup();
+    map.fitBounds(accuracyCircle.getBounds(), {
+      paddingTopLeft: [32, 115],
+      paddingBottomRight: [70, 110],
+      maxZoom: 16,
+      animate: false
+    });
+    showLocationMessage('Location found. Approximate accuracy: ' + accuracyText + ' m.');
+  }
+
+  function locateUser() {
+    if (!window.isSecureContext) {
+      showLocationMessage('Location needs a secure connection. Open this page over HTTPS, then try again.');
+      return;
+    }
+    if (!navigator.geolocation) {
+      showLocationMessage('Location is not supported by this browser. Try another browser to show your position.');
+      return;
+    }
+    locationButton.disabled = true;
+    locationButton.setAttribute('aria-busy', 'true');
+    showLocationMessage('Finding your location…');
+    try {
+      navigator.geolocation.getCurrentPosition(showLocation, showLocationError, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
+      });
+    } catch {
+      showLocationError({ code: 1 });
+    }
+  }
+
+  const locationControl = L.control({ position: 'bottomright' });
+  locationControl.onAdd = () => {
+    const container = L.DomUtil.create('div', 'leaflet-bar');
+    locationButton = L.DomUtil.create('button', 'location-button', container);
+    locationButton.type = 'button';
+    locationButton.title = 'My location';
+    locationButton.setAttribute('aria-label', 'My location');
+    locationButton.setAttribute('aria-busy', 'false');
+    locationButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>';
+    L.DomEvent.disableClickPropagation(container);
+    locationButton.addEventListener('click', locateUser);
+    return container;
+  };
+  locationControl.addTo(map);
+
+
+  // City layers can be exchanged without changing the user's map position.
+  regions.forEach(region => region.spots.forEach(spot => {
     L.polygon(spot.polygon, {
       color: spot.color,
       weight: 2,
@@ -216,14 +264,14 @@
       fillColor: spot.color,
       fillOpacity: 0.12,
       interactive: false
-    }).addTo(map);
+    }).addTo(region.layer);
 
     spot.corridors.forEach(corridor => {
       L.polyline(corridor.coords, {
         color: spot.color,
         weight: 6,
         opacity: 0.9
-      }).addTo(map).bindPopup('<strong>' + corridor.name + '</strong><br>' + shortName);
+      }).addTo(region.layer).bindPopup('<strong>' + corridor.name + '</strong><br>' + spot.name);
     });
 
     const icon = L.divIcon({
@@ -233,62 +281,125 @@
       iconAnchor: [22, 22],
       popupAnchor: [0, -18]
     });
-
     const popup = `
-      <h2>${spot.emoji} ${shortName}</h2>
+      <h2>${spot.emoji} ${spot.name}</h2>
       <p>${spot.stretch}</p>
       <p class="spot-hours">${spot.hours}</p>
       <p class="popup-description">${spot.description}</p>
-      <a class="button button-primary" href="${directions}" target="_blank" rel="noopener noreferrer">Get directions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+      <a class="button button-primary" href="${directionsUrl(spot.location)}" target="_blank" rel="noopener noreferrer">Get directions ${externalIcon}</a>
+      ${sourceLink(spot)}
     `;
     const marker = L.marker(spot.center, { icon, title: spot.name, alt: spot.name })
-      .addTo(map).bindPopup(popup, {
+      .bindPopup(popup, {
         maxWidth: 300,
         maxHeight: Math.max(100, window.innerHeight - 220),
         autoPanPaddingTopLeft: L.point(24, 110),
         autoPanPaddingBottomRight: L.point(24, 80)
       });
-    // Leaflet's default generic marker label is replaced with a useful destination.
-    marker.getElement().setAttribute('aria-label', spot.name);
+    marker.on('add', () => marker.getElement().setAttribute('aria-label', spot.name));
+    marker.addTo(region.layer);
     markers.set(spot.id, marker);
+  }));
 
+  function renderCard(spot) {
     const card = document.createElement('article');
     card.className = 'spot-card';
     card.style.setProperty('--spot-color', spot.color);
     card.innerHTML = `
       <div class="spot-heading">
         <span class="spot-emoji" aria-hidden="true">${spot.emoji}</span>
-        <div><h3>${shortName}</h3><p class="spot-subtitle">${subtitle}</p></div>
+        <div><h3>${spot.name}</h3><p class="spot-subtitle">${spot.detail}</p></div>
       </div>
       <p class="spot-stretch">${spot.stretch}</p>
       <p class="spot-hours">${spot.hours}</p>
       <p class="spot-description">${spot.description}</p>
       <div class="card-actions">
-        <button class="button spot-show" type="button" aria-label="Show ${shortName} on map">Show on map</button>
-        <a class="button button-secondary" href="${directions}" target="_blank" rel="noopener noreferrer" aria-label="Get directions to ${shortName}">Directions <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg></a>
+        <button class="button spot-show" type="button" aria-label="Show ${spot.name} on map">Show on map</button>
+        <a class="button button-secondary" href="${directionsUrl(spot.location)}" target="_blank" rel="noopener noreferrer" aria-label="Get directions to ${spot.name}">Directions ${externalIcon}</a>
       </div>
+      ${sourceLink(spot)}
     `;
     card.querySelector('button').addEventListener('click', () => {
       guide.close();
       map.setView(spot.center, spot.zoom, { animate: false });
+      const marker = markers.get(spot.id);
       marker.openPopup();
       marker.getPopup().getElement().querySelector('.button').focus({ preventScroll: true });
       mapStatus.textContent = 'Showing ' + spot.name + '. Highlighted lines mark the suggested streets.';
     });
-    cardsContainer.appendChild(card);
-  });
+    return card;
+  }
 
-  let activePopup = null;
+  function regionForMap() {
+    const viewport = map.getBounds();
+    // A wide view containing both cities offers an overview rather than picking one.
+    if (regions.every(region => viewport.contains(region.bounds.getCenter()))) return null;
+    return regions.find(region => region.coverage.contains(map.getCenter())) || null;
+  }
+
+  function syncGuideToMap() {
+    const region = regionForMap();
+    // Preserve scroll, focus, and the current popup while exploring the same area.
+    if (region === activeRegion) return;
+    activeRegion = region;
+    regions.forEach(item => {
+      const shouldShow = !region || item === region;
+      if (shouldShow && !map.hasLayer(item.layer)) item.layer.addTo(map);
+      if (!shouldShow && map.hasLayer(item.layer)) map.removeLayer(item.layer);
+    });
+
+    const brand = region ? region.brand : 'Halloween Map';
+    document.getElementById('mapTitle').textContent = brand;
+    document.getElementById('areaLabel').textContent = (region ? region.label : 'SF + LOS ANGELES') + ' · OCT 31';
+    document.title = brand + ' · Neighborhood Haunt Guide';
+    document.getElementById('map').setAttribute('aria-label', (region ? region.name : 'SF and LA') + ' Halloween neighborhood map');
+    document.getElementById('guideTitle').textContent = region ? region.name + ' haunts' : 'Find your next haunt';
+    document.getElementById('guideIntro').textContent = region ? region.intro : 'We currently cover San Francisco and Greater Los Angeles. Move the map to either area or choose a city above to explore its neighborhoods.';
+    document.getElementById('visitNote').textContent = region ? region.visitNote : 'Choose a city to see neighborhood details and local guides.';
+    tourLink.hidden = !region;
+    document.getElementById('tourNote').hidden = !region;
+    if (region) {
+      tourLink.href = tourUrl(region);
+      document.getElementById('tourLabel').textContent = 'Open the ' + region.spots.length + '-stop driving tour';
+      document.getElementById('tourNote').textContent = region.tourNote;
+    } else {
+      tourLink.removeAttribute('href');
+      document.getElementById('tourLabel').textContent = '';
+      document.getElementById('tourNote').textContent = '';
+    }
+    document.querySelectorAll('[data-city]').forEach(button => {
+      if (button.dataset.city === region?.id) button.setAttribute('aria-current', 'location');
+      else button.removeAttribute('aria-current');
+    });
+
+    const restoreFocus = cardsContainer.contains(document.activeElement);
+    cardsContainer.replaceChildren(...(region ? region.spots.map(renderCard) : []));
+    drawerContent.scrollTop = 0;
+    if (restoreFocus) drawerContent.focus({ preventScroll: true });
+
+    const visibleSpots = region ? region.spots : regions.flatMap(item => item.spots);
+    document.getElementById('hintCount').textContent = visibleSpots.length + ' neighborhoods';
+    document.getElementById('hintText').textContent = region ? 'Tap a pin to find your haunt' : 'Explore San Francisco or Los Angeles';
+    document.getElementById('hintDots').replaceChildren(...visibleSpots.map(spot => {
+      const dot = document.createElement('i');
+      dot.style.setProperty('--spot-color', spot.color);
+      return dot;
+    }));
+    mapStatus.textContent = region
+      ? 'Showing ' + region.spots.length + ' neighborhoods in ' + region.name + '.'
+      : 'Showing available guides for San Francisco and Los Angeles.';
+  }
+
   map.on('popupopen', event => {
     activePopup = event.popup;
     mapHint.hidden = true;
+    locationNotice.hidden = true;
   });
   map.on('popupclose', event => {
     activePopup = null;
     mapHint.hidden = false;
-    // Avoid losing keyboard focus when a popup's focused link is removed.
     if (event.popup.getElement()?.contains(document.activeElement)) {
-      const source = [...markers.values()].find(marker => marker.getPopup() === event.popup);
+      const source = [...markers.values(), locationMarker].find(marker => marker?.getPopup() === event.popup);
       source?.getElement()?.focus({ preventScroll: true });
     }
   });
@@ -298,5 +409,9 @@
     });
     activePopup?.update();
   });
+  map.on('moveend', syncGuideToMap);
 
+  tiles.addTo(map);
+  syncGuideToMap();
+  fitAll();
 })();

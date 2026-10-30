@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#171923" />
-  <meta name="description" content="Find San Francisco's Halloween decorations, highlighted streets, and neighborhood haunts. Explore the map and get directions." />
-  <title>SF Halloween · Neighborhood Haunt Guide</title>
+  <meta name="description" content="Find Halloween decoration neighborhoods in San Francisco and Greater Los Angeles. The guide follows the map as you explore." />
+  <title>SF + LA Halloween · Neighborhood Haunt Guide</title>
   <link rel="stylesheet" href="./assets/leaflet/leaflet.css" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -16,8 +16,8 @@
     <div class="brand">
       <span class="brand-icon" aria-hidden="true">🎃</span>
       <div>
-        <p class="eyebrow">SAN FRANCISCO · OCT 31</p>
-        <h1>SF Halloween</h1>
+        <p id="areaLabel" class="eyebrow">SAN FRANCISCO · OCT 31</p>
+        <h1 id="mapTitle">SF Halloween</h1>
       </div>
     </div>
     <button id="openGuide" class="button button-primary guide-toggle" type="button" aria-controls="guidePanel" aria-haspopup="dialog" aria-expanded="false">
@@ -27,8 +27,8 @@
   </header>
 
   <div class="map-hint" aria-hidden="true">
-    <span class="hint-dots"><i></i><i></i><i></i><i></i></span>
-    <span><strong>4 neighborhoods</strong><br>Tap a pin to find your haunt</span>
+    <span id="hintDots" class="hint-dots"></span>
+    <span><strong id="hintCount">4 neighborhoods</strong><br><span id="hintText">Tap a pin to find your haunt</span></span>
   </div>
 
   <div id="tileNotice" class="map-notice" role="status" hidden>
@@ -37,27 +37,38 @@
   </div>
   <p id="mapStatus" class="sr-only" role="status"></p>
 
+  <div id="locationNotice" class="location-notice" hidden>
+    <p id="locationStatus" role="status"></p>
+    <button id="dismissLocationNotice" class="icon-button" type="button" aria-label="Dismiss location message">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>
+    </button>
+  </div>
+
   <dialog id="guidePanel" aria-labelledby="guideTitle">
     <div class="drawer-header">
       <div>
-        <p class="eyebrow">THE NEIGHBORHOOD GUIDE</p>
-        <h2 id="guideTitle">Find your kind of spooky.</h2>
+        <p class="eyebrow">THE GUIDE FOLLOWS YOUR MAP</p>
+        <h2 id="guideTitle">San Francisco haunts</h2>
       </div>
       <button id="closeGuide" class="icon-button" type="button" aria-label="Close neighborhood guide" autofocus>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m6 6 12 12M6 18 18 6"/></svg>
       </button>
     </div>
     <div class="drawer-content" tabindex="0" aria-label="Neighborhoods and tour">
+      <nav class="city-switcher" aria-label="Jump to a city">
+        <button class="button button-secondary" type="button" data-city="sf">San Francisco</button>
+        <button class="button button-secondary" type="button" data-city="la">Los Angeles</button>
+      </nav>
       <div class="guide-intro">
-        <p>Four neighborhoods. Plenty of Halloween spirit. Pick a stop to see the decorated streets, or make a night of it.</p>
-        <a class="button button-primary tour-link" href="https://www.google.com/maps/dir/?api=1&amp;origin=Chenery+St+%26+Diamond+St,San+Francisco,CA&amp;destination=Grove+St+%26+Lyon+St,San+Francisco,CA&amp;waypoints=Shotwell+St+%26+22nd+St,San+Francisco,CA%7CBelvedere+St+%26+17th+St,San+Francisco,CA&amp;travelmode=driving" target="_blank" rel="noopener noreferrer">
-          Open the 4-stop driving tour <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg>
+        <p id="guideIntro"></p>
+        <a class="button button-primary tour-link" target="_blank" rel="noopener noreferrer">
+          <span id="tourLabel"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M7 17 17 7M7 7h10v10"/></svg>
         </a>
-        <p class="tour-note">Opens Google Maps · Choose your travel mode there</p>
+        <p id="tourNote" class="tour-note"></p>
       </div>
       <div id="cardsContainer" class="neighborhoods"></div>
       <div class="guide-footer">
-        <p><strong>A little local knowledge</strong><br>Shaded areas are approximate; colored lines mark the suggested streets. Viewing times and street closures may change. Check locally before heading out.</p>
+        <p><strong>A little local knowledge</strong><br>Shaded areas are approximate; colored lines mark the suggested streets. <span id="visitNote"></span></p>
         <p>Map data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>.</p>
       </div>
     </div>
@@ -65,6 +76,7 @@
 
   <noscript><div class="map-notice">Enable JavaScript to explore the interactive map.</div></noscript>
   <script src="./assets/leaflet/leaflet.js"></script>
+  <script src="./guides.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>
