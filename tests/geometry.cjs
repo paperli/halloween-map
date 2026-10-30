@@ -105,9 +105,15 @@ for (const region of guides) for (const spot of region.spots) {
   assert.ok(['Polygon', 'MultiPolygon'].includes(spot.area.type));
   assert.ok(contains(spot.area, pin), spot.id + ': pin is within the guide area');
   const polygons = spot.area.type === 'Polygon' ? [spot.area.coordinates] : spot.area.coordinates;
-  for (const rings of polygons) for (const ring of rings) {
+  for (const rings of polygons) for (const [ringIndex, ring] of rings.entries()) {
     assert.ok(ring.length >= 4);
     assert.equal(distance(ring[0], ring.at(-1)), 0, 'Closed polygon rings');
+    const origin = ring[0];
+    const signedArea = ring.slice(1).reduce((sum, point, index) => {
+      const previous = ring[index];
+      return sum + (previous[0] - origin[0]) * (point[1] - origin[1]) - (point[0] - origin[0]) * (previous[1] - origin[1]);
+    }, 0);
+    assert.ok(ringIndex === 0 ? signedArea > 0 : signedArea < 0, 'GeoJSON exterior/hole winding follows the right-hand rule');
     for (const point of ring) {
       assert.ok(point.length === 2 && point.every(Number.isFinite), 'Finite longitude/latitude');
       assert.ok(distanceToLines(point, lines) <= plan.bufferMeters + 0.25, spot.id + ': shading stays near the audited streets');

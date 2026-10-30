@@ -8,7 +8,7 @@ import json
 import math
 from pathlib import Path
 
-from shapely import transform
+from shapely import orient_polygons, transform
 from shapely.geometry import LineString, mapping
 from shapely.ops import unary_union
 
@@ -122,6 +122,7 @@ def build():
         area = unary_union(lines).buffer(plan['bufferMeters'], quad_segs=8).simplify(0.2, preserve_topology=True)
         if not area.is_valid or area.is_empty:
             raise ValueError(f'Invalid frontage area for {spot_id}')
+        area = orient_polygons(area)
         result[spot_id] = {
             'center': [round(lat, 7), round(lon, 7)],
             'bufferMeters': plan['bufferMeters'],
