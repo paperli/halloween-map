@@ -29,7 +29,8 @@ const server = http.createServer(async (request, response) => {
   let browser;
   try {
     const guidesCode = await fs.readFile(path.join(root, 'guides.js'), 'utf8');
-    const guides = vm.runInNewContext(guidesCode + '; HALLOWEEN_GUIDES');
+    const geometryCode = await fs.readFile(path.join(root, 'geometry.js'), 'utf8');
+    const guides = vm.runInNewContext(geometryCode + guidesCode + '; HALLOWEEN_GUIDES');
     const ids = new Set();
     for (const region of guides) {
       assert.equal(region.tourOrder.length, region.spots.length);
@@ -148,8 +149,9 @@ const server = http.createServer(async (request, response) => {
       const tour = new URL(await page.locator('.tour-link').getAttribute('href'));
       assert.equal(tour.searchParams.get('travelmode'), 'driving');
       assert.equal(tour.searchParams.get('waypoints').split('|').length, 2);
-      assert.equal(await page.locator('.spot-card a').count(), 4);
-      const directions = new URL(await page.locator('.spot-card a').last().getAttribute('href'));
+      assert.equal(await page.locator('.spot-card .card-actions a').count(), 4);
+      assert.equal(await page.locator('.spot-card .spot-source').count(), 4, 'SF cards link to local sources');
+      const directions = new URL(await page.locator('.spot-card .card-actions a').last().getAttribute('href'));
       assert.equal(directions.searchParams.get('destination'), 'Belvedere St & 17th St,San Francisco,CA');
 
       // Scroll the last neighborhood fully into view and open its map popup.
@@ -282,6 +284,38 @@ const server = http.createServer(async (request, response) => {
       assert.deepEqual(errors, [], 'No browser errors');
       assert.deepEqual(failedAssets, [], 'All project-path assets resolve');
       console.log('PASS ' + profile.name);
+      await context.close();
+    }
+
+    // Exercise every audited area in the actual map, including disjoint footprints.
+    {
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+      const page = await context.newPage();
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ contentType: 'image/png', body: png }));
+      await page.goto(url, { waitUntil: 'networkidle' });
+      for (const region of guides) {
+        await page.getByRole('button', { name: /^Explore/ }).click();
+        await page.getByRole('button', { name: region.name, exact: true }).click();
+        assert.equal(await page.locator('.neighborhood-area').count(), region.spots.length);
+        assert.equal(await page.locator('.neighborhood-corridor').count(), region.spots.reduce((n, spot) => n + spot.corridors.length, 0));
+        for (const spot of region.spots) {
+          await page.getByRole('button', { name: /^Explore/ }).click();
+          const show = page.getByRole('button', { name: 'Show ' + spot.name + ' on map', exact: true });
+          await show.scrollIntoViewIfNeeded();
+          await show.click();
+          const popup = page.locator('.leaflet-popup');
+          assert.ok((await popup.innerText()).includes(spot.name));
+          const box = await popup.boundingBox();
+          assert.ok(box.x >= -1 && box.x + box.width <= 391, spot.id + ': popup is readable on a phone');
+          const directions = new URL(await popup.locator('.button').getAttribute('href'));
+          assert.equal(directions.searchParams.get('destination'), spot.location);
+          await page.getByRole('button', { name: 'Close popup' }).click();
+          console.log('PASS map area ' + spot.id);
+        }
+      }
+      assert.deepEqual(errors, []);
       await context.close();
     }
 

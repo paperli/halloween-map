@@ -1,0 +1,194 @@
+{
+  "glen-park": {
+    "network": "sf",
+    "bufferMeters": 40,
+    "pin": {
+      "street": "CHENERY ST",
+      "cross": "DIAMOND ST"
+    },
+    "corridors": [
+      {
+        "name": "Chenery St · Diamond to Elk",
+        "street": "CHENERY ST",
+        "from": "DIAMOND ST",
+        "to": "ELK ST",
+        "permitCase": "Trick or Treat - Chenery Street"
+      },
+      {
+        "name": "Sussex St · Swiss to Diamond Heights",
+        "street": "SUSSEX ST",
+        "from": "SWISS AVE",
+        "to": "DIAMOND HEIGHTS BLVD"
+      }
+    ]
+  },
+  "nopa": {
+    "network": "sf",
+    "bufferMeters": 40,
+    "pin": {
+      "street": "GROVE ST",
+      "cross": "LYON ST"
+    },
+    "corridors": [
+      {
+        "name": "Grove St · Baker to Central",
+        "street": "GROVE ST",
+        "from": "BAKER ST",
+        "to": "CENTRAL AVE",
+        "permitCase": "NOPNA Halloween Block Party"
+      },
+      {
+        "name": "Lyon St · Fulton to Hayes",
+        "street": "LYON ST",
+        "from": "FULTON ST",
+        "to": "HAYES ST",
+        "permitCase": "NOPNA Halloween Block Party"
+      }
+    ]
+  },
+  "mission": {
+    "network": "sf",
+    "bufferMeters": 40,
+    "pin": {
+      "street": "SHOTWELL ST",
+      "cross": "22ND ST"
+    },
+    "corridors": [
+      {
+        "name": "Shotwell St · 18th to 24th",
+        "street": "SHOTWELL ST",
+        "from": "18TH ST",
+        "to": "24TH ST",
+        "permitCase": "Trick-or-Treat - Shotwell 2026"
+      },
+      {
+        "name": "Fair Oaks St · 22nd to 26th",
+        "street": "FAIR OAKS ST",
+        "from": "22ND ST",
+        "to": "26TH ST",
+        "permitCase": "Fair Oaks Halloween 2026"
+      }
+    ]
+  },
+  "cole-valley": {
+    "network": "sf",
+    "bufferMeters": 40,
+    "pin": {
+      "street": "BELVEDERE ST",
+      "cross": "17TH ST"
+    },
+    "corridors": [
+      {
+        "name": "Belvedere St · 17th to Parnassus",
+        "street": "BELVEDERE ST",
+        "from": "17TH ST",
+        "to": "PARNASSUS AVE"
+      },
+      {
+        "name": "Shrader St · Frederick to Beulah",
+        "street": "SHRADER ST",
+        "from": "FREDERICK ST",
+        "to": "BEULAH ST",
+        "permitCase": "Block Party - Shrader St Halloween"
+      }
+    ]
+  },
+  "toluca-lake": {
+    "network": "la-toluca",
+    "bufferMeters": 40,
+    "pin": {
+      "street": "Ledge Avenue",
+      "cross": "Moorpark Street"
+    },
+    "corridors": [
+      {
+        "name": "Ledge Ave · Moorpark to Valley Spring",
+        "street": "Ledge Avenue",
+        "from": "Moorpark Street",
+        "to": "Valley Spring Lane"
+      }
+    ]
+  },
+  "magnolia-park": {
+    "network": "la-burbank",
+    "bufferMeters": 40,
+    "pin": {
+      "street": "North California Street",
+      "cross": "West Magnolia Boulevard"
+    },
+    "corridors": [
+      {
+        "name": "N California St · Magnolia to Chandler",
+        "street": "North California Street",
+        "from": "West Magnolia Boulevard",
+        "to": "West Chandler Boulevard South"
+      }
+    ]
+  },
+  "angelino-heights": {
+    "network": "la-angelino",
+    "bufferMeters": 40,
+    "pin": {
+      "street": "Carroll Avenue",
+      "cross": "Douglas Street"
+    },
+    "corridors": [
+      {
+        "name": "Carroll Ave · Douglas to E Edgeware",
+        "street": "Carroll Avenue",
+        "from": "Douglas Street",
+        "to": "East Edgeware Road"
+      }
+    ]
+  },
+  "venice-canals": {
+    "network": "la-venice",
+    "bufferMeters": 15,
+    "pin": {
+      "street": "Dell Avenue",
+      "cross": "South Venice Boulevard"
+    },
+    "corridors": [
+      {
+        "name": "Dell Ave · S Venice to 28th",
+        "street": "Dell Avenue",
+        "from": "South Venice Boulevard",
+        "to": "28th Avenue"
+      },
+      {
+        "name": "Carroll Canal Walk · north bank",
+        "street": "Carroll Canal Walk",
+        "from": "Grand Canal Walk",
+        "to": "Eastern Canal",
+        "wayIds": [
+          "13320361"
+        ]
+      },
+      {
+        "name": "Linnie Canal Walk · north bank",
+        "street": "Linnie Canal Walk",
+        "from": "Grand Canal Walk",
+        "to": "Eastern Canal",
+        "wayIds": [
+          "13382802"
+        ]
+      }
+    ]
+  },
+  "sierra-madre": {
+    "network": "la-sierra",
+    "bufferMeters": 40,
+    "pin": {
+      "street": "East Alegria Avenue",
+      "cross": "North Baldwin Avenue"
+    },
+    "corridors": [
+      {
+        "name": "E Alegria Ave · Baldwin to Mountain Trail",
+        "street": "East Alegria Avenue",
+        "from": "North Baldwin Avenue",
+        "to": "North Mountain Trail Avenue"
+      }
+    ]
+  }
+}

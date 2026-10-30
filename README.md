@@ -4,7 +4,7 @@ An interactive guide to four San Francisco and five Greater Los Angeles Hallowee
 
 ## A guide that follows the map
 
-Panning, zooming, or using **My location** updates the guide when the map center enters the SF or LA coverage area. The title, neighborhood cards, pins, shaded areas, street highlights, count, directions, and driving tour change together. The switch never pans or zooms the map on its own, and movement within the same city preserves guide scroll and open popups.
+Panning, zooming, or using **My location** updates the guide when the map center enters the SF or LA coverage area. The title, neighborhood cards, pins, street-frontage shading, street highlights, count, directions, and driving tour change together. The switch never pans or zooms the map on its own, and movement within the same city preserves guide scroll and open popups.
 
 Use **San Francisco** or **Los Angeles** in the guide to jump between cities. **All** fits the neighborhoods in the current city. When both cities are visible at a wide zoom, or the center is outside coverage, the guide offers both city choices and hides the city-specific tour. **All** then fits both cities.
 
@@ -46,7 +46,9 @@ This uses the browser’s built-in geolocation service, with no API key. It requ
 
 ## Edit the guide
 
-Neighborhood descriptions, coordinates, street corridors, source links, and viewing advice are in `guides.js`. Each city has its own `spots`, `tourOrder`, and `coverageBounds`; the latter are approximate areas for switching guides, not administrative boundaries. Tour URLs are generated from that city's stops. LA data describes recurring neighborhood traditions and does not promise current-year participation or fixed display hours. Confirm local event times and closures before relying on them.
+Descriptions, source links, viewing advice, directions queries, and tour order are in `guides.js`. Audited pins, street lines, and frontage areas are generated in `geometry.js` from the committed street reference and geometry plan. All nine areas were checked against public street data; findings are in [NEIGHBORHOOD_AUDIT.md](NEIGHBORHOOD_AUDIT.md), with provenance and rebuild instructions in [DATA_SOURCES.md](DATA_SOURCES.md).
+
+Each city has its own `spots`, `tourOrder`, and `coverageBounds`; the latter are approximate areas for switching guides, not administrative boundaries. Shading follows the highlighted walks and nearby frontage; separate walks keep separate shapes. Tour URLs are generated from each city's stops. LA data describes recurring neighborhood traditions and does not promise current-year participation or fixed display hours. Confirm local event times and closures before relying on them.
 
 ## Checks
 
@@ -57,7 +59,7 @@ npm run check
 npm test
 ```
 
-The browser checks cover desktop, tablet, small phones, landscape, drawer scrolling and dismissal, keyboard access, neighborhood selection, directions, map controls, viewport resizing, tile failure/retry, and location success, refresh, denied access, unavailable services, timeouts, and unsupported or insecure browsers. Startup checks cover automatic SF/LA positioning with existing consent, first-visit city/location choices, remembered cities, blocked storage, missing permission APIs, and delayed results after navigation. They also exercise SF/LA switching through map movement, city jumps, geolocation, wide views, and areas outside coverage, including route isolation and scroll preservation. They serve the app under `/halloween-map/` to catch project-path issues and stub tile images for reproducible checks without relying on the public tile service.
+Geometry checks cover all nine neighborhoods against the stored street/junction snapshots, including road adherence, named endpoints, pin placement, SF permitted extents, public canal footways, and frontage containment. Browser checks open every audited area on a phone and also cover desktop, tablet, small phones, landscape, drawer scrolling/dismissal, keyboard access, directions, map controls, resizing, tile failure/retry, location handling, startup consent/fallbacks, and SF/LA switching. They serve the app under `/halloween-map/` to catch project-path issues and stub tile images for reproducible checks without relying on the public tile service.
 
 To use an installed Chromium instead of Playwright's download:
 

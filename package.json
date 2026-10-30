@@ -4,8 +4,8 @@
   "private": true,
   "description": "A static, key-free Halloween neighborhood map for San Francisco and Los Angeles",
   "scripts": {
-    "test": "node tests/browser.cjs",
-    "check": "node --check app.js && node --check guides.js"
+    "test": "node tests/geometry.cjs && node tests/browser.cjs",
+    "check": "node --check app.js && node --check guides.js && node --check geometry.js"
   },
   "devDependencies": {
     "playwright": "1.62.1"
