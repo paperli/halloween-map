@@ -1,0 +1,13 @@
+{
+  "name": "sf-halloween-map",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A static, key-free San Francisco Halloween neighborhood map",
+  "scripts": {
+    "test": "node tests/browser.cjs",
+    "check": "node --check app.js"
+  },
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
+}
