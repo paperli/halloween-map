@@ -45,7 +45,17 @@ const server = http.createServer(async (request, response) => {
       const context = await browser.newContext({
         viewport: { width: profile.width, height: profile.height },
         hasTouch: profile.touch,
-        reducedMotion: 'reduce'
+        reducedMotion: 'reduce',
+        permissions: ['geolocation'],
+        geolocation: { latitude: 37.758, longitude: -122.442, accuracy: 25 }
+      });
+      await context.addInitScript(() => {
+        window.locationRequests = 0;
+        const getPosition = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+        navigator.geolocation.getCurrentPosition = (...args) => {
+          window.locationRequests++;
+          return getPosition(...args);
+        };
       });
       const page = await context.newPage();
       const errors = [];
@@ -74,7 +84,7 @@ const server = http.createServer(async (request, response) => {
       assert.equal(await page.locator('#tileNotice').isVisible(), false);
       assert.ok(externalRequests.length > 0, 'Tile requests were made');
       assert.ok(externalRequests.every(item => item.startsWith('https://tile.openstreetmap.org/')), 'Only standard OSM is requested');
-      for (const control of await page.locator('.leaflet-bar a, #openGuide').all()) {
+      for (const control of await page.locator('.leaflet-bar a, .location-button, #openGuide').all()) {
         const box = await control.boundingBox();
         assert.ok(box.width >= 44 && box.height >= 44, profile.name + ': 44px controls');
       }
@@ -132,6 +142,35 @@ const server = http.createServer(async (request, response) => {
       await page.mouse.click(2, 2);
       assert.equal(await page.locator('dialog').evaluate(element => element.open), false, 'Backdrop dismisses guide');
 
+      // Location is opt-in, updates without duplicate markers, and works outside SF.
+      assert.equal(await page.evaluate(() => window.locationRequests), 0, 'No automatic location request');
+      const locate = page.getByRole('button', { name: 'My location', exact: true });
+      await locate.focus();
+      await page.keyboard.press('Enter');
+      await page.locator('.user-location-marker').waitFor();
+      await page.waitForFunction(() => document.querySelector('.location-button').getAttribute('aria-busy') === 'false');
+      assert.equal(await page.evaluate(() => window.locationRequests), 1);
+      assert.match(await page.locator('#locationStatus').textContent(), /accuracy: 25 m/);
+      assert.equal(await page.locator('.location-accuracy').count(), 1);
+      const locationBox = await page.locator('.user-location-marker').boundingBox();
+      assert.ok(locationBox.x >= 0 && locationBox.y >= 0 && locationBox.x + locationBox.width <= profile.width && locationBox.y + locationBox.height <= profile.height, 'Location is in view');
+      await page.getByRole('button', { name: 'Dismiss location message' }).click();
+      assert.equal(await page.locator('#locationNotice').isVisible(), false);
+
+      await context.setGeolocation({ latitude: 34.0522, longitude: -118.2437, accuracy: 100 });
+      await locate.click();
+      await page.waitForFunction(() => document.getElementById('locationStatus').textContent.includes('accuracy: 100 m'));
+      assert.equal(await page.locator('.user-location-marker').count(), 1);
+      assert.equal(await page.locator('.location-accuracy').count(), 1);
+      assert.equal(await page.evaluate(() => window.locationRequests), 2);
+      const sfMarkerBox = await firstMarker.boundingBox();
+      assert.ok(sfMarkerBox.x < 0 || sfMarkerBox.x > profile.width || sfMarkerBox.y < 0 || sfMarkerBox.y > profile.height, 'Map centers on the actual location outside SF');
+      await page.locator('.user-location-marker').focus();
+      await page.keyboard.press('Enter');
+      assert.match(await page.locator('.leaflet-popup').innerText(), /Your location[\s\S]*100 m/);
+      assert.equal(await page.locator('#locationNotice').isVisible(), false, 'Notice does not cover popup');
+      await page.getByRole('button', { name: 'Show all neighborhoods' }).click();
+
       // Abort real tile requests, then retry successfully.
       failTiles = true;
       await page.reload({ waitUntil: 'networkidle' });
@@ -150,6 +189,69 @@ const server = http.createServer(async (request, response) => {
       assert.deepEqual(errors, [], 'No browser errors');
       assert.deepEqual(failedAssets, [], 'All project-path assets resolve');
       console.log('PASS ' + profile.name);
+      await context.close();
+    }
+
+    for (const scenario of ['denied', 'unavailable', 'timeout', 'unsupported', 'insecure', 'loading']) {
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+      await context.addInitScript(scenario => {
+        window.locationRequests = 0;
+        if (scenario === 'unsupported') {
+          Object.defineProperty(navigator, 'geolocation', { value: undefined });
+        } else if (scenario === 'insecure') {
+          Object.defineProperty(window, 'isSecureContext', { value: false });
+        } else {
+          Object.defineProperty(navigator, 'geolocation', { value: {
+            getCurrentPosition(success, error, options) {
+              window.locationRequests++;
+              window.locationOptions = options;
+              window.completeLocation = success;
+              if (scenario !== 'loading') error({ code: { denied: 1, unavailable: 2, timeout: 3 }[scenario] });
+            }
+          } });
+        }
+      }, scenario);
+      const page = await context.newPage();
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ contentType: 'image/png', body: png }));
+      await page.goto(url, { waitUntil: 'networkidle' });
+      const locate = page.getByRole('button', { name: 'My location', exact: true });
+      await locate.click();
+      const messages = {
+        denied: /access was denied/,
+        unavailable: /location is unavailable/,
+        timeout: /took too long/,
+        unsupported: /not supported/,
+        insecure: /HTTPS/,
+        loading: /Finding your location/
+      };
+      assert.match(await page.locator('#locationStatus').textContent(), messages[scenario]);
+      assert.equal(await page.locator('#locationNotice').isVisible(), true);
+      assert.equal(await locate.isDisabled(), scenario === 'loading');
+      assert.equal(await locate.getAttribute('aria-busy'), String(scenario === 'loading'));
+      if (scenario === 'loading') {
+        assert.deepEqual(await page.evaluate(() => window.locationOptions), { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+        // Repeated taps while locating must not start multiple permission requests.
+        await locate.evaluate(element => element.click());
+        assert.equal(await page.evaluate(() => window.locationRequests), 1);
+        await page.evaluate(() => window.completeLocation({ coords: { latitude: 37.758, longitude: -122.442, accuracy: 15 } }));
+        assert.equal(await locate.isDisabled(), false);
+        assert.equal(await page.locator('.user-location-marker').count(), 1);
+      } else if (scenario === 'denied') {
+        // After an error, a new click can succeed without a reload.
+        await page.evaluate(() => {
+          navigator.geolocation.getCurrentPosition = success => success({ coords: { latitude: 37.758, longitude: -122.442, accuracy: 20 } });
+        });
+        await locate.click();
+        assert.equal(await page.locator('.user-location-marker').count(), 1);
+        await page.evaluate(() => { navigator.geolocation.getCurrentPosition = (success, error) => error({ code: 1 }); });
+        await locate.click();
+        assert.match(await page.locator('#locationStatus').textContent(), /last found position/);
+        assert.equal(await page.locator('.user-location-marker').count(), 1, 'Last known position remains after failed refresh');
+      }
+      assert.deepEqual(errors, [], 'No browser errors in ' + scenario);
+      console.log('PASS location ' + scenario);
       await context.close();
     }
   } finally {

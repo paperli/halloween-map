@@ -26,6 +26,12 @@ The basemap uses **https://tile.openstreetmap.org/{z}/{x}/{y}.png** with linked 
 
 The standard OSM tile service requires no API key. Respect its [tile usage policy](https://operations.osmfoundation.org/policies/tiles/): preserve attribution, normal browser caching and referrers; do not bulk download or prefetch tiles. Public tiles are best-effort and can block clients or become unavailable. If traffic grows beyond a small community map, review hosting options. The app shows a retry action when tile requests fail. Regions, pins, and the guide remain available without basemap tiles.
 
+## Your location
+
+Tap the crosshair **My location** button above the map controls to request your current position. The map centers on a blue dot and shows a circle for the reported accuracy. Tap again to refresh. Location access is requested only when you press the button; the app does not continuously track, store, or send your coordinates to an application backend. As with any map movement, the basemap service receives requests for the tiles around the displayed area.
+
+This uses the browser’s built-in geolocation service, with no API key. It requires location permission and HTTPS (GitHub Pages provides this), or localhost for development. Denied permissions, unavailable location services, and timeouts show instructions for trying again. If a refresh fails, the previous dot remains and the message explains that it is the last found position.
+
 ## Edit the guide
 
 Neighborhood descriptions, coordinates, street corridors, and viewing times are in the `spots` array in `app.js`. These are approximate guide areas, not surveyed boundaries. Confirm local event times and closures before relying on them. The four-stop tour link is in `index.html`.
@@ -39,7 +45,7 @@ npm run check
 npm test
 ```
 
-The browser checks cover desktop, tablet, small phones, landscape, drawer scrolling and dismissal, keyboard access, neighborhood selection, directions, map controls, viewport resizing, and tile failure/retry. They serve the app under `/sf-halloween-map/` to catch project-path issues and stub tile images for reproducible checks without relying on the public tile service.
+The browser checks cover desktop, tablet, small phones, landscape, drawer scrolling and dismissal, keyboard access, neighborhood selection, directions, map controls, viewport resizing, tile failure/retry, and location success, refresh, denied access, unavailable services, timeouts, and unsupported or insecure browsers. They serve the app under `/sf-halloween-map/` to catch project-path issues and stub tile images for reproducible checks without relying on the public tile service.
 
 To use an installed Chromium instead of Playwright's download:
 

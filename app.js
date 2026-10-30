@@ -201,6 +201,120 @@
   };
   resetControl.addTo(map);
 
+  const locationNotice = document.getElementById('locationNotice');
+  const locationStatus = document.getElementById('locationStatus');
+  let locationMarker;
+  let accuracyCircle;
+  let locationButton;
+
+  function showLocationMessage(message) {
+    locationStatus.textContent = message;
+    locationNotice.hidden = false;
+  }
+
+  document.getElementById('dismissLocationNotice').addEventListener('click', () => {
+    locationNotice.hidden = true;
+    locationButton.focus({ preventScroll: true });
+  });
+
+  function finishLocating() {
+    locationButton.disabled = false;
+    locationButton.setAttribute('aria-busy', 'false');
+  }
+
+  function showLocationError(error) {
+    finishLocating();
+    const messages = {
+      1: 'Location access was denied. Allow location for this site in your browser settings, then try again.',
+      2: 'Your location is unavailable. Check that location services are enabled, then try again.',
+      3: 'Finding your location took too long. Try again where you have a clearer GPS signal.'
+    };
+    const message = messages[error.code] || 'Your location couldn’t be found. Please try again.';
+    showLocationMessage(message + (locationMarker ? ' The dot still shows your last found position.' : ''));
+  }
+
+  function showLocation(position) {
+    finishLocating();
+    const { latitude, longitude, accuracy } = position.coords;
+    const latlng = L.latLng(latitude, longitude);
+    const accuracyText = Math.round(accuracy).toLocaleString();
+    if (!accuracyCircle) {
+      accuracyCircle = L.circle(latlng, {
+        radius: accuracy,
+        color: '#2563eb',
+        weight: 1,
+        opacity: 0.5,
+        fillColor: '#3b82f6',
+        fillOpacity: 0.12,
+        interactive: false,
+        className: 'location-accuracy'
+      }).addTo(map);
+      locationMarker = L.marker(latlng, {
+        icon: L.divIcon({
+          className: 'user-location-marker',
+          html: '<span class="user-location-dot" aria-hidden="true"></span>',
+          iconSize: [44, 44],
+          iconAnchor: [22, 22],
+          popupAnchor: [0, -10]
+        }),
+        title: 'Your location',
+        alt: 'Your location',
+        zIndexOffset: 1000
+      }).addTo(map);
+      locationMarker.getElement().setAttribute('aria-label', 'Your location');
+    } else {
+      accuracyCircle.setLatLng(latlng).setRadius(accuracy);
+      locationMarker.setLatLng(latlng);
+    }
+    locationMarker.bindPopup('<strong>Your location</strong><br>Approximate accuracy: ' + accuracyText + ' m.<br>Tap My location again to refresh.');
+    map.closePopup();
+    map.fitBounds(accuracyCircle.getBounds(), {
+      paddingTopLeft: [32, 115],
+      paddingBottomRight: [70, 110],
+      maxZoom: 16,
+      animate: false
+    });
+    showLocationMessage('Location found. Approximate accuracy: ' + accuracyText + ' m.');
+  }
+
+  function locateUser() {
+    if (!window.isSecureContext) {
+      showLocationMessage('Location needs a secure connection. Open this page over HTTPS, then try again.');
+      return;
+    }
+    if (!navigator.geolocation) {
+      showLocationMessage('Location is not supported by this browser. Try another browser to show your position.');
+      return;
+    }
+    locationButton.disabled = true;
+    locationButton.setAttribute('aria-busy', 'true');
+    showLocationMessage('Finding your location…');
+    try {
+      navigator.geolocation.getCurrentPosition(showLocation, showLocationError, {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
+      });
+    } catch {
+      showLocationError({ code: 1 });
+    }
+  }
+
+  const locationControl = L.control({ position: 'bottomright' });
+  locationControl.onAdd = () => {
+    const container = L.DomUtil.create('div', 'leaflet-bar');
+    locationButton = L.DomUtil.create('button', 'location-button', container);
+    locationButton.type = 'button';
+    locationButton.title = 'My location';
+    locationButton.setAttribute('aria-label', 'My location');
+    locationButton.setAttribute('aria-busy', 'false');
+    locationButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>';
+    L.DomEvent.disableClickPropagation(container);
+    locationButton.addEventListener('click', locateUser);
+    return container;
+  };
+  locationControl.addTo(map);
+
   tiles.addTo(map);
   fitAll();
 
@@ -282,6 +396,7 @@
   map.on('popupopen', event => {
     activePopup = event.popup;
     mapHint.hidden = true;
+    locationNotice.hidden = true;
   });
   map.on('popupclose', event => {
     activePopup = null;
