@@ -63,11 +63,14 @@ body:has(#tileNotice:not([hidden])) .map-hint { display: none; }
 .location-notice {
   position: fixed; z-index: 600; top: max(96px, calc(env(safe-area-inset-top) + 84px));
   left: max(16px, env(safe-area-inset-left)); right: max(16px, env(safe-area-inset-right)); max-width: 420px;
-  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 14px;
   background: var(--page); border: 1px solid var(--border); border-radius: 14px;
   box-shadow: 0 4px 24px #0b101533;
 }
 .location-notice p { margin: 0; flex: 1; font-size: 14px; }
+.location-choices { flex-basis: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.location-choices .button { padding-inline: 8px; font-size: 13px; }
+#useLocation { grid-column: 1 / -1; }
 #guidePanel {
   position: fixed; inset: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) auto;
   margin: 0; padding: 0; width: 460px; max-width: calc(100% - 32px); height: auto; max-height: none;
