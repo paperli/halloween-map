@@ -6,7 +6,9 @@ An interactive guide to four San Francisco and five Greater Los Angeles Hallowee
 
 Panning, zooming, or using **My location** updates the guide when the map center enters the SF or LA coverage area. The title, neighborhood cards, pins, shaded areas, street highlights, count, directions, and driving tour change together. The switch never pans or zooms the map on its own, and movement within the same city preserves guide scroll and open popups.
 
-Use **San Francisco** or **Los Angeles** in the guide to jump between cities. **All** fits the neighborhoods in the current city. When both cities are visible at a wide zoom, or the center is outside coverage, the guide offers both city choices and hides the city-specific tour. **All** then fits both cities. The initial view remains San Francisco.
+Use **San Francisco** or **Los Angeles** in the guide to jump between cities. **All** fits the neighborhoods in the current city. When both cities are visible at a wide zoom, or the center is outside coverage, the guide offers both city choices and hides the city-specific tour. **All** then fits both cities.
+
+On arrival, an existing browser location permission lets the map automatically center near the visitor and select the matching guide. Without that permission, returning visitors start in their last viewed city; new visitors see both cities and can choose **Use my location**, **San Francisco**, or **Los Angeles**. The app never opens a browser permission prompt until the visitor presses a location button. If a visitor starts navigating while an automatic location check is pending, that navigation takes priority over a late result.
 
 LA stops: Toluca Lake, Burbank / Magnolia Park, Angelino Heights, Venice Canals, and Sierra Madre / Alegria Avenue. Each links to a local guide. The optional five-stop driving tour spans Greater LA; allow time for traffic and parking. Sources and map-coordinate provenance are recorded in [DATA_SOURCES.md](DATA_SOURCES.md).
 
@@ -36,7 +38,9 @@ The standard OSM tile service requires no API key. Respect its [tile usage polic
 
 ## Your location
 
-Tap the crosshair **My location** button above the map controls to request your current position. The map centers on a blue dot and shows a circle for the reported accuracy. Tap again to refresh. Location access is requested only when you press the button; the app does not continuously track, store, or send your coordinates to an application backend. As with any map movement, the basemap service receives requests for the tiles around the displayed area.
+With location permission already granted, the site requests one position at startup and opens a neighborhood-scale view near the visitor. Otherwise, tap **Use my location** or the crosshair **My location** button to grant access. The blue dot shows the reported position and the circle shows its accuracy. Tap the crosshair again for a fresh, closer view. The app does not continuously track, save precise coordinates, or send them to an application backend. As with any map movement, the basemap service receives requests for the tiles around the displayed area.
+
+Only the last viewed city ID (`sf` or `la`) is remembered in browser storage under `halloween-map:city`. If storage or permission queries are unavailable, city selection and manual location access still work. No IP-geolocation service or extra API key is used.
 
 This uses the browser’s built-in geolocation service, with no API key. It requires location permission and HTTPS (GitHub Pages provides this), or localhost for development. Denied permissions, unavailable location services, and timeouts show instructions for trying again. If a refresh fails, the previous dot remains and the message explains that it is the last found position.
 
@@ -53,7 +57,7 @@ npm run check
 npm test
 ```
 
-The browser checks cover desktop, tablet, small phones, landscape, drawer scrolling and dismissal, keyboard access, neighborhood selection, directions, map controls, viewport resizing, tile failure/retry, and location success, refresh, denied access, unavailable services, timeouts, and unsupported or insecure browsers. They also exercise SF/LA switching through map movement, city jumps, geolocation, wide views, and areas outside coverage, including route isolation and scroll preservation. They serve the app under `/halloween-map/` to catch project-path issues and stub tile images for reproducible checks without relying on the public tile service.
+The browser checks cover desktop, tablet, small phones, landscape, drawer scrolling and dismissal, keyboard access, neighborhood selection, directions, map controls, viewport resizing, tile failure/retry, and location success, refresh, denied access, unavailable services, timeouts, and unsupported or insecure browsers. Startup checks cover automatic SF/LA positioning with existing consent, first-visit city/location choices, remembered cities, blocked storage, missing permission APIs, and delayed results after navigation. They also exercise SF/LA switching through map movement, city jumps, geolocation, wide views, and areas outside coverage, including route isolation and scroll preservation. They serve the app under `/halloween-map/` to catch project-path issues and stub tile images for reproducible checks without relying on the public tile service.
 
 To use an installed Chromium instead of Playwright's download:
 

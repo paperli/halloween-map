@@ -67,6 +67,8 @@ const server = http.createServer(async (request, response) => {
         geolocation: { latitude: 37.758, longitude: -122.442, accuracy: 25 }
       });
       await context.addInitScript(() => {
+        // Treat the main interaction suite as a first visit without location consent.
+        Object.defineProperty(navigator, 'permissions', { value: { query: async () => ({ state: 'prompt' }) } });
         window.locationRequests = 0;
         const getPosition = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
         navigator.geolocation.getCurrentPosition = (...args) => {
@@ -98,6 +100,17 @@ const server = http.createServer(async (request, response) => {
         return route.abort();
       });
       await page.goto(url, { waitUntil: 'networkidle' });
+      await page.locator('#locationChoices').waitFor();
+      assert.equal(await page.locator('#mapTitle').textContent(), 'Halloween Map', 'Unknown visitors start with both cities');
+      assert.equal(await page.locator('.halloween-marker').count(), 9);
+      assert.equal(await page.evaluate(() => window.locationRequests), 0, 'First visit does not trigger a browser prompt');
+      for (const choice of await page.locator('#locationChoices button').all()) {
+        const box = await choice.boundingBox();
+        assert.ok(box.width >= 44 && box.height >= 44, 'Startup choices have 44px targets');
+      }
+      const chooserBox = await page.locator('#locationNotice').boundingBox();
+      assert.ok(chooserBox.x >= 0 && chooserBox.x + chooserBox.width <= profile.width && chooserBox.y + chooserBox.height <= profile.height, 'Startup chooser fits the viewport');
+      await page.getByRole('button', { name: 'San Francisco', exact: true }).click();
       const dimensions = await page.locator('#map').boundingBox();
       assert.equal(dimensions.width, profile.width, profile.name + ': full-width map');
       assert.equal(dimensions.height, profile.height, profile.name + ': full-height map');
@@ -248,6 +261,9 @@ const server = http.createServer(async (request, response) => {
       assert.equal(await page.locator('#locationNotice').isVisible(), false, 'Notice does not cover popup');
       await page.getByRole('button', { name: 'Show all neighborhoods' }).click();
 
+      await toggle.click();
+      await page.getByRole('button', { name: 'San Francisco', exact: true }).click();
+
       // Abort real tile requests, then retry successfully.
       failTiles = true;
       await page.reload({ waitUntil: 'networkidle' });
@@ -266,6 +282,118 @@ const server = http.createServer(async (request, response) => {
       assert.deepEqual(errors, [], 'No browser errors');
       assert.deepEqual(failedAssets, [], 'All project-path assets resolve');
       console.log('PASS ' + profile.name);
+      await context.close();
+    }
+
+    // Previously granted permission centers the first view near the actual visitor.
+    for (const city of [
+      { name: 'LA', latitude: 34.0522, longitude: -118.2437, title: 'LA Halloween', count: 5 },
+      { name: 'SF', latitude: 37.758, longitude: -122.442, title: 'SF Halloween', count: 4 }
+    ]) {
+      const context = await browser.newContext({
+        viewport: { width: 390, height: 844 }, reducedMotion: 'reduce',
+        permissions: ['geolocation'], geolocation: { latitude: city.latitude, longitude: city.longitude, accuracy: 50 }
+      });
+      await context.addInitScript(() => {
+        window.locationRequests = 0;
+        const getPosition = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+        navigator.geolocation.getCurrentPosition = (...args) => { window.locationRequests++; return getPosition(...args); };
+      });
+      const page = await context.newPage();
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ contentType: 'image/png', body: png }));
+      await page.goto(url, { waitUntil: 'networkidle' });
+      await page.locator('.user-location-marker').waitFor();
+      assert.equal(await page.locator('#mapTitle').textContent(), city.title);
+      assert.equal(await page.locator('.halloween-marker').count(), city.count);
+      assert.equal(await page.evaluate(() => window.locationRequests), 1, 'One automatic location fix');
+      assert.equal(await page.locator('#locationChoices').isVisible(), false);
+      const userBox = await page.locator('.user-location-marker').boundingBox();
+      assert.ok(userBox.x >= 0 && userBox.x + userBox.width <= 390 && userBox.y >= 0 && userBox.y + userBox.height <= 844);
+      assert.deepEqual(errors, []);
+      console.log('PASS automatic startup ' + city.name);
+      await context.close();
+    }
+
+    // Consent is requested by a click, and city-only preferences survive a reload.
+    for (const mode of ['prompt', 'denied', 'missing-permissions', 'query-rejected', 'blocked-storage']) {
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+      await context.addInitScript(mode => {
+        window.locationRequests = 0;
+        Object.defineProperty(navigator, 'permissions', { value: mode === 'missing-permissions' ? undefined : {
+          query: async () => {
+            if (mode === 'query-rejected') throw new Error('Unsupported permission query');
+            return { state: mode === 'denied' ? 'denied' : 'prompt' };
+          }
+        } });
+        Object.defineProperty(navigator, 'geolocation', { value: {
+          getCurrentPosition(success) {
+            window.locationRequests++;
+            success({ coords: { latitude: 34.0522, longitude: -118.2437, accuracy: 20 } });
+          }
+        } });
+        if (mode === 'blocked-storage') Object.defineProperty(window, 'localStorage', { get() { throw new Error('Storage blocked'); } });
+      }, mode);
+      const page = await context.newPage();
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ contentType: 'image/png', body: png }));
+      await page.goto(url, { waitUntil: 'networkidle' });
+      await page.locator('#locationChoices').waitFor();
+      assert.equal(await page.evaluate(() => window.locationRequests), 0);
+      assert.equal(await page.getByRole('button', { name: 'Use my location', exact: true }).isVisible(), mode !== 'denied');
+      if (mode === 'prompt') {
+        await page.getByRole('button', { name: 'Use my location', exact: true }).click();
+        assert.equal(await page.evaluate(() => window.locationRequests), 1);
+        assert.equal(await page.locator('#mapTitle').textContent(), 'LA Halloween');
+        assert.equal(await page.locator('.user-location-marker').count(), 1);
+      } else {
+        await page.getByRole('button', { name: 'Los Angeles', exact: true }).click();
+      }
+      if (mode !== 'blocked-storage') {
+        assert.equal(await page.evaluate(() => localStorage.getItem('halloween-map:city')), 'la');
+        const keys = await page.evaluate(() => Object.keys(localStorage));
+        assert.deepEqual(keys, ['halloween-map:city'], 'Only the city is saved');
+      }
+      await page.reload({ waitUntil: 'networkidle' });
+      assert.equal(await page.evaluate(() => window.locationRequests), 0, 'No implicit geolocation after reload without consent');
+      assert.equal(await page.locator('#mapTitle').textContent(), mode === 'blocked-storage' ? 'Halloween Map' : 'LA Halloween');
+      assert.equal(await page.locator('#locationNotice').isVisible(), mode === 'blocked-storage');
+      assert.deepEqual(errors, []);
+      console.log('PASS startup fallback ' + mode);
+      await context.close();
+    }
+
+    // An automatic fix that arrives after navigation must not pull the map back.
+    for (const delayed of ['permission', 'position']) {
+      const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+      await context.addInitScript(delayed => {
+        window.locationRequests = 0;
+        Object.defineProperty(navigator, 'permissions', { value: {
+          query: () => delayed === 'permission'
+            ? new Promise(resolve => { window.resolveLocationPermission = resolve; })
+            : Promise.resolve({ state: 'granted' })
+        } });
+        Object.defineProperty(navigator, 'geolocation', { value: {
+          getCurrentPosition(success) { window.locationRequests++; window.resolvePosition = success; }
+        } });
+      }, delayed);
+      const page = await context.newPage();
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.route('https://tile.openstreetmap.org/**', route => route.fulfill({ contentType: 'image/png', body: png }));
+      await page.goto(url, { waitUntil: 'networkidle' });
+      await page.getByRole('button', { name: /^Explore/ }).click();
+      await page.getByRole('button', { name: 'San Francisco', exact: true }).click();
+      if (delayed === 'permission') await page.evaluate(() => window.resolveLocationPermission({ state: 'granted' }));
+      else await page.evaluate(() => window.resolvePosition({ coords: { latitude: 34.0522, longitude: -118.2437, accuracy: 20 } }));
+      assert.equal(await page.locator('#mapTitle').textContent(), 'SF Halloween');
+      assert.equal(await page.locator('.user-location-marker').count(), 0);
+      assert.equal(await page.evaluate(() => window.locationRequests), delayed === 'permission' ? 0 : 1);
+      assert.equal(await page.getByRole('button', { name: 'My location', exact: true }).isDisabled(), false);
+      assert.deepEqual(errors, []);
+      console.log('PASS navigation beats delayed ' + delayed);
       await context.close();
     }
 

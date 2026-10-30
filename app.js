@@ -38,6 +38,14 @@
     bounds: L.latLngBounds(region.spots.flatMap(spot => spot.polygon)),
     layer: L.layerGroup()
   }));
+  const cityStorageKey = 'halloween-map:city';
+  let rememberedRegion;
+  try {
+    const city = localStorage.getItem(cityStorageKey);
+    rememberedRegion = regions.find(region => region.id === city);
+  } catch {
+    // Browsers that block storage can still use the map and location controls.
+  }
   const allBounds = L.latLngBounds(regions.flatMap(region => region.spots.flatMap(spot => spot.polygon)));
   const guide = document.getElementById('guidePanel');
   const openGuide = document.getElementById('openGuide');
@@ -89,6 +97,7 @@
   }
 
   openGuide.addEventListener('click', () => {
+    cancelStartupLocation();
     guide.showModal();
     openGuide.setAttribute('aria-expanded', 'true');
   });
@@ -111,6 +120,7 @@
 
   document.querySelectorAll('[data-city]').forEach(button => {
     button.addEventListener('click', () => {
+      cancelStartupLocation();
       guide.close();
       fitRegion(regions.find(region => region.id === button.dataset.city));
     });
@@ -128,11 +138,13 @@
     L.DomEvent.disableClickPropagation(container);
     L.DomEvent.on(button, 'click', event => {
       L.DomEvent.preventDefault(event);
+      cancelStartupLocation();
       fitAll();
     });
     L.DomEvent.on(button, 'keydown', event => {
       if (event.key === ' ') {
         L.DomEvent.preventDefault(event);
+        cancelStartupLocation();
         fitAll();
       }
     });
@@ -142,16 +154,23 @@
 
   const locationNotice = document.getElementById('locationNotice');
   const locationStatus = document.getElementById('locationStatus');
+  const locationChoices = document.getElementById('locationChoices');
+  const useLocation = document.getElementById('useLocation');
   let locationMarker;
   let accuracyCircle;
   let locationButton;
+  let startupAllowed = true;
+  let requestVersion = 0;
+  let automaticRequest = null;
 
   function showLocationMessage(message) {
+    locationChoices.hidden = true;
     locationStatus.textContent = message;
     locationNotice.hidden = false;
   }
 
   document.getElementById('dismissLocationNotice').addEventListener('click', () => {
+    cancelStartupLocation();
     locationNotice.hidden = true;
     locationButton.focus({ preventScroll: true });
   });
@@ -159,6 +178,25 @@
   function finishLocating() {
     locationButton.disabled = false;
     locationButton.setAttribute('aria-busy', 'false');
+  }
+
+  function showLocationChoices(canLocate = true) {
+    showLocationMessage(canLocate
+      ? 'Find Halloween near you. Use your location or choose a city.'
+      : 'Choose a city to explore Halloween neighborhoods.');
+    useLocation.hidden = !canLocate;
+    locationChoices.hidden = false;
+  }
+
+  function cancelStartupLocation() {
+    startupAllowed = false;
+    if (automaticRequest !== null) {
+      requestVersion++;
+      automaticRequest = null;
+      finishLocating();
+      locationNotice.hidden = true;
+    }
+    if (!locationChoices.hidden) locationNotice.hidden = true;
   }
 
   function showLocationError(error) {
@@ -172,7 +210,7 @@
     showLocationMessage(message + (locationMarker ? ' The dot still shows your last found position.' : ''));
   }
 
-  function showLocation(position) {
+  function showLocation(position, automatic) {
     finishLocating();
     const { latitude, longitude, accuracy } = position.coords;
     const latlng = L.latLng(latitude, longitude);
@@ -210,13 +248,16 @@
     map.fitBounds(accuracyCircle.getBounds(), {
       paddingTopLeft: [32, 115],
       paddingBottomRight: [70, 110],
-      maxZoom: 16,
+      maxZoom: automatic ? 13 : 16,
       animate: false
     });
     showLocationMessage('Location found. Approximate accuracy: ' + accuracyText + ' m.');
+    if (automatic && !activeRegion) showLocationChoices(false);
   }
 
-  function locateUser() {
+  function locateUser({ automatic = false } = {}) {
+    if (!automatic) cancelStartupLocation();
+    if (locationButton.disabled) return;
     if (!window.isSecureContext) {
       showLocationMessage('Location needs a secure connection. Open this page over HTTPS, then try again.');
       return;
@@ -228,14 +269,26 @@
     locationButton.disabled = true;
     locationButton.setAttribute('aria-busy', 'true');
     showLocationMessage('Finding your location…');
+    const version = ++requestVersion;
+    if (automatic) automaticRequest = version;
+    const onSuccess = position => {
+      if (version !== requestVersion) return;
+      automaticRequest = null;
+      showLocation(position, automatic);
+    };
+    const onError = error => {
+      if (version !== requestVersion) return;
+      automaticRequest = null;
+      showLocationError(error);
+    };
     try {
-      navigator.geolocation.getCurrentPosition(showLocation, showLocationError, {
-        enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 0
+      navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+        enableHighAccuracy: !automatic,
+        timeout: automatic ? 10000 : 15000,
+        maximumAge: automatic ? 60000 : 0
       });
     } catch {
-      showLocationError({ code: 1 });
+      onError({ code: 1 });
     }
   }
 
@@ -249,10 +302,27 @@
     locationButton.setAttribute('aria-busy', 'false');
     locationButton.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>';
     L.DomEvent.disableClickPropagation(container);
-    locationButton.addEventListener('click', locateUser);
+    locationButton.addEventListener('click', () => locateUser());
     return container;
   };
   locationControl.addTo(map);
+  useLocation.addEventListener('click', () => locateUser());
+
+  async function startNearVisitor() {
+    if (!window.isSecureContext || !navigator.geolocation) {
+      if (!rememberedRegion) showLocationChoices(false);
+      return;
+    }
+    let permission;
+    try {
+      permission = await navigator.permissions?.query({ name: 'geolocation' });
+    } catch {
+      // Permission queries are optional; the explicit location button still works.
+    }
+    if (!startupAllowed) return;
+    if (permission?.state === 'granted') locateUser({ automatic: true });
+    else if (!rememberedRegion) showLocationChoices(permission?.state !== 'denied');
+  }
 
 
   // City layers can be exchanged without changing the user's map position.
@@ -342,6 +412,9 @@
     // Preserve scroll, focus, and the current popup while exploring the same area.
     if (region === activeRegion) return;
     activeRegion = region;
+    if (region) {
+      try { localStorage.setItem(cityStorageKey, region.id); } catch { /* Storage is optional. */ }
+    }
     regions.forEach(item => {
       const shouldShow = !region || item === region;
       if (shouldShow && !map.hasLayer(item.layer)) item.layer.addTo(map);
@@ -412,6 +485,9 @@
   map.on('moveend', syncGuideToMap);
 
   tiles.addTo(map);
+  fitRegion(rememberedRegion);
   syncGuideToMap();
-  fitAll();
+  // A late automatic fix must not undo a visitor's navigation or city choice.
+  map.on('dragstart zoomstart click', cancelStartupLocation);
+  startNearVisitor();
 })();
