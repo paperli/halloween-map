@@ -40,7 +40,7 @@ Coordinate data from OpenStreetMap © [OpenStreetMap contributors](https://www.o
 
 ## Rebuilding and checking
 
-The published website needs no build step or geocoding requests. For a deliberate data update:
+The published website needs no build step or geocoding requests. Deliberate data regeneration requires Python 3.11 or later for the pinned `shapely==2.2.0` dependency. Make sure `python3` meets that requirement before creating the virtual environment:
 
 ```sh
 python3 -m venv .venv-geometry
