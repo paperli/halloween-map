@@ -32,10 +32,16 @@
     tiles.redraw();
   });
 
+  const neighborhoodBounds = new Map(HALLOWEEN_GUIDES.flatMap(region => region.spots.map(spot => [
+    spot.id, L.geoJSON(spot.area).getBounds()
+  ])));
   const regions = HALLOWEEN_GUIDES.map(region => ({
     ...region,
     coverage: L.latLngBounds(region.coverageBounds),
-    bounds: L.latLngBounds(region.spots.flatMap(spot => spot.polygon)),
+    bounds: L.latLngBounds(region.spots.flatMap(spot => {
+      const bounds = neighborhoodBounds.get(spot.id);
+      return [bounds.getSouthWest(), bounds.getNorthEast()];
+    })),
     layer: L.layerGroup()
   }));
   const cityStorageKey = 'halloween-map:city';
@@ -46,7 +52,7 @@
   } catch {
     // Browsers that block storage can still use the map and location controls.
   }
-  const allBounds = L.latLngBounds(regions.flatMap(region => region.spots.flatMap(spot => spot.polygon)));
+  const allBounds = L.latLngBounds(regions.flatMap(region => [region.bounds.getSouthWest(), region.bounds.getNorthEast()]));
   const guide = document.getElementById('guidePanel');
   const openGuide = document.getElementById('openGuide');
   const mapStatus = document.getElementById('mapStatus');
@@ -243,7 +249,7 @@
       accuracyCircle.setLatLng(latlng).setRadius(accuracy);
       locationMarker.setLatLng(latlng);
     }
-    locationMarker.bindPopup('<strong>Your location</strong><br>Approximate accuracy: ' + accuracyText + ' m.<br>Tap My location again to refresh.');
+    locationMarker.bindPopup('<strong>Your location</strong><br>Approximate accuracy: ' + accuracyText + ' m.<br>Tap My location again to refresh.', { autoPan: !reduceMotion });
     map.closePopup();
     map.fitBounds(accuracyCircle.getBounds(), {
       paddingTopLeft: [32, 115],
@@ -327,21 +333,25 @@
 
   // City layers can be exchanged without changing the user's map position.
   regions.forEach(region => region.spots.forEach(spot => {
-    L.polygon(spot.polygon, {
-      color: spot.color,
-      weight: 2,
-      dashArray: '5, 5',
-      fillColor: spot.color,
-      fillOpacity: 0.12,
-      interactive: false
+    L.geoJSON(spot.area, {
+      interactive: false,
+      style: {
+        className: 'neighborhood-area',
+        color: spot.color,
+        weight: 1,
+        opacity: 0.35,
+        fillColor: spot.color,
+        fillOpacity: 0.12
+      }
     }).addTo(region.layer);
 
     spot.corridors.forEach(corridor => {
       L.polyline(corridor.coords, {
+        className: 'neighborhood-corridor',
         color: spot.color,
         weight: 6,
         opacity: 0.9
-      }).addTo(region.layer).bindPopup('<strong>' + corridor.name + '</strong><br>' + spot.name);
+      }).addTo(region.layer).bindPopup('<strong>' + corridor.name + '</strong><br>' + spot.name, { autoPan: !reduceMotion });
     });
 
     const icon = L.divIcon({
@@ -361,6 +371,7 @@
     `;
     const marker = L.marker(spot.center, { icon, title: spot.name, alt: spot.name })
       .bindPopup(popup, {
+        autoPan: !reduceMotion,
         maxWidth: 300,
         maxHeight: Math.max(100, window.innerHeight - 220),
         autoPanPaddingTopLeft: L.point(24, 110),
@@ -391,7 +402,12 @@
     `;
     card.querySelector('button').addEventListener('click', () => {
       guide.close();
-      map.setView(spot.center, spot.zoom, { animate: false });
+      map.fitBounds(neighborhoodBounds.get(spot.id), {
+        paddingTopLeft: [32, 115],
+        paddingBottomRight: [70, 110],
+        maxZoom: spot.zoom,
+        animate: false
+      });
       const marker = markers.get(spot.id);
       marker.openPopup();
       marker.getPopup().getElement().querySelector('.button').focus({ preventScroll: true });
@@ -463,10 +479,23 @@
       : 'Showing available guides for San Francisco and Los Angeles.';
   }
 
+  function fitPopupWithoutMotion(popup) {
+    if (!reduceMotion) return;
+    const rect = popup.getElement().getBoundingClientRect();
+    const viewport = document.getElementById('map').getBoundingClientRect();
+    let dx = 0, dy = 0;
+    if (rect.right > viewport.right - 24) dx = rect.right - viewport.right + 24;
+    if (rect.left - dx < viewport.left + 24) dx = rect.left - viewport.left - 24;
+    if (rect.bottom > viewport.bottom - 80) dy = rect.bottom - viewport.bottom + 80;
+    if (rect.top - dy < viewport.top + 110) dy = rect.top - viewport.top - 110;
+    if (dx || dy) map.panBy([dx, dy], { animate: false });
+  }
+
   map.on('popupopen', event => {
     activePopup = event.popup;
     mapHint.hidden = true;
     locationNotice.hidden = true;
+    fitPopupWithoutMotion(event.popup);
   });
   map.on('popupclose', event => {
     activePopup = null;
@@ -481,6 +510,7 @@
       marker.getPopup().options.maxHeight = Math.max(100, window.innerHeight - 220);
     });
     activePopup?.update();
+    if (activePopup) fitPopupWithoutMotion(activePopup);
   });
   map.on('moveend', syncGuideToMap);
 

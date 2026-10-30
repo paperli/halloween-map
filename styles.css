@@ -156,6 +156,7 @@ body:has(#tileNotice:not([hidden])) .map-hint { display: none; }
 .leaflet-popup-content .button { width: 100%; margin-top: 6px; color: var(--ink); }
 .leaflet-container a.leaflet-popup-close-button { width: 44px; height: 44px; line-height: 44px; color: var(--muted); font-size: 24px; }
 .leaflet-popup-content .spot-hours { font-size: 12px; }
+.leaflet-popup-content a.spot-source { color: var(--orange); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 @media (max-width: 600px) {
